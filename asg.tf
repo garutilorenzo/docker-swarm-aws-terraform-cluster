@@ -1,5 +1,5 @@
 resource "aws_autoscaling_group" "docker_swarm_managers_asg" {
-  name                      = "${var.common_prefix}-managers-asg-${var.environment}"
+  name                      = "${local.common_prefix}-managers-asg"
   wait_for_capacity_timeout = "5m"
   vpc_zone_identifier       = var.vpc_private_subnets
 
@@ -49,24 +49,23 @@ resource "aws_autoscaling_group" "docker_swarm_managers_asg" {
 
   tag {
     key                 = "Name"
-    value               = "${var.common_prefix}-manager-${var.environment}"
+    value               = "${local.common_prefix}-manager"
     propagate_at_launch = true
   }
 
   tag {
-    key                 = var.docker_swarm_tag_key
-    value               = var.docker_swarm_manager_tag_value
+    key                 = var.docker_swarm_manager_tag
+    value               = "true"
     propagate_at_launch = true
   }
 
   depends_on = [
-    aws_secretsmanager_secret.join_manager_secret,
-    aws_secretsmanager_secret.join_worker_secret,
+    aws_secretsmanager_secret.join_secret,
   ]
 }
 
 resource "aws_autoscaling_group" "docker_swarm_workers_asg" {
-  name                = "${var.common_prefix}-workers-asg-${var.environment}"
+  name                = "${local.common_prefix}-workers-asg"
   vpc_zone_identifier = var.vpc_private_subnets
 
   lifecycle {
@@ -115,18 +114,17 @@ resource "aws_autoscaling_group" "docker_swarm_workers_asg" {
 
   tag {
     key                 = "Name"
-    value               = "${var.common_prefix}-worker-${var.environment}"
+    value               = "${local.common_prefix}-worker"
     propagate_at_launch = true
   }
 
   tag {
-    key                 = var.docker_swarm_tag_key
-    value               = var.docker_swarm_manager_tag_worker
+    key                 = var.docker_swarm_worker_tag
+    value               = "true"
     propagate_at_launch = true
   }
 
   depends_on = [
-    aws_secretsmanager_secret.join_manager_secret,
-    aws_secretsmanager_secret.join_worker_secret,
+    aws_secretsmanager_secret.join_secret,
   ]
 }

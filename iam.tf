@@ -1,17 +1,17 @@
 resource "aws_iam_instance_profile" "docker_swarm_instance_profile" {
-  name = "${var.common_prefix}-ec2-instance-profile--${var.environment}"
+  name = "${local.common_prefix}-ec2-instance-profile-"
   role = aws_iam_role.docker_swarm_iam_role.name
 
   tags = merge(
     local.global_tags,
     {
-      "Name" = lower("${var.common_prefix}-ec2-instance-profile--${var.environment}")
+      "Name" = lower("${local.common_prefix}-ec2-instance-profile-")
     }
   )
 }
 
 resource "aws_iam_role" "docker_swarm_iam_role" {
-  name = "${var.common_prefix}-iam-role-${var.environment}"
+  name = "${local.common_prefix}-iam-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -30,13 +30,13 @@ resource "aws_iam_role" "docker_swarm_iam_role" {
   tags = merge(
     local.global_tags,
     {
-      "Name" = lower("${var.common_prefix}-iam-role-${var.environment}")
+      "Name" = lower("${local.common_prefix}-iam-role")
     }
   )
 }
 
 resource "aws_iam_policy" "allow_secrets_manager" {
-  name        = "${var.common_prefix}-secrets-manager-policy-${var.environment}"
+  name        = "${local.common_prefix}-secrets-manager-policy"
   path        = "/"
   description = "Secrets Manager Policy"
 
@@ -55,8 +55,7 @@ resource "aws_iam_policy" "allow_secrets_manager" {
           "secretsmanager:PutSecretValue"
         ],
         Resource = [
-          "${aws_secretsmanager_secret.join_manager_secret.arn}",
-          "${aws_secretsmanager_secret.join_worker_secret.arn}"
+          "${aws_secretsmanager_secret.join_secret.arn}"
         ],
         Condition = {
           StringEquals = {
@@ -79,7 +78,7 @@ resource "aws_iam_policy" "allow_secrets_manager" {
   tags = merge(
     local.global_tags,
     {
-      "Name" = lower("${var.common_prefix}-secrets-manager-policy-${var.environment}")
+      "Name" = lower("${local.common_prefix}-secrets-manager-policy")
     }
   )
 }

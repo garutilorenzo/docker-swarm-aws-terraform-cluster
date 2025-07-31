@@ -1,8 +1,8 @@
 resource "aws_launch_template" "docker_swarm_manager" {
-  name_prefix   = "${var.common_prefix}-manager-tpl-${var.environment}"
+  name_prefix   = "${local.common_prefix}-manager-tpl"
   image_id      = var.ami
   instance_type = var.default_instance_type
-  user_data     = data.template_cloudinit_config.docker_swarm_manager.rendered
+  user_data     = data.template_cloudinit_config.docker_swarm_cloudinit.rendered
 
   lifecycle {
     create_before_destroy = true
@@ -31,16 +31,16 @@ resource "aws_launch_template" "docker_swarm_manager" {
   tags = merge(
     local.global_tags,
     {
-      "Name" = lower("${var.common_prefix}-manager-tpl-${var.environment}")
+      "Name" = lower("${local.common_prefix}-manager-tpl")
     }
   )
 }
 
 resource "aws_launch_template" "docker_swarm_worker" {
-  name_prefix   = "${var.common_prefix}-worker-tpl-${var.environment}"
+  name_prefix   = "${local.common_prefix}-worker-tpl"
   image_id      = var.ami
   instance_type = var.default_instance_type
-  user_data     = data.template_cloudinit_config.docker_swarm_worker.rendered
+  user_data     = data.template_cloudinit_config.docker_swarm_cloudinit.rendered
 
   lifecycle {
     create_before_destroy = true
@@ -69,7 +69,7 @@ resource "aws_launch_template" "docker_swarm_worker" {
   tags = merge(
     local.global_tags,
     {
-      "Name" = lower("${var.common_prefix}-worker-tpl-${var.environment}")
+      "Name" = lower("${local.common_prefix}-worker-tpl")
     }
   )
 }

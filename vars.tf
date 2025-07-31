@@ -42,13 +42,6 @@ variable "ec2_associate_public_ip_address" {
   default = false
 }
 
-## eu-west-1
-# Ubuntu 22.04
-# ami-04807f3bd9aa6aab7
-
-# Amazon Linux 2 AMI (HVM) - Kernel 5.10, SSD Volume Type
-# ami-006be9ab6a140de6e
-
 variable "ami" {
   type    = string
   default = "ami-04807f3bd9aa6aab7"
@@ -130,25 +123,20 @@ variable "extlb_https_port" {
   default = 443
 }
 
-variable "docker_swarm_tag_key" {
-  type    = string
-  default = "docker-swarm-instance-type"
-}
-
-variable "docker_swarm_manager_tag_value" {
+variable "docker_swarm_manager_tag" {
   type    = string
   default = "docker-swarm-manager"
 }
 
-variable "docker_swarm_manager_tag_worker" {
+variable "docker_swarm_worker_tag" {
   type    = string
   default = "docker-swarm-worker"
 }
 
-variable "default_secret_placeholder" {
-  type    = string
-  default = "DEFAULTPLACEHOLDER"
-}
+# variable "default_secret_placeholder" {
+#   type    = string
+#   default = "defaultvalue"
+# }
 
 variable "cluster_name" {
   type        = string

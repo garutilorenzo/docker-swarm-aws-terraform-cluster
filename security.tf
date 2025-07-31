@@ -10,7 +10,7 @@ resource "aws_security_group" "docker_swarm_sg" {
   tags = merge(
     local.global_tags,
     {
-      "Name" = lower("${var.common_prefix}-allow-strict-${var.environment}")
+      "Name" = lower("${local.common_prefix}-allow-strict")
     }
   )
 }
@@ -65,7 +65,7 @@ resource "aws_security_group_rule" "allow_lb_https_traffic" {
 # resource "aws_security_group" "efs_sg" {
 #   count       = var.efs_persistent_storage ? 1 : 0
 #   vpc_id      = var.vpc_id
-#   name        = "${var.common_prefix}-efs-sg-${var.environment}"
+#   name        = "${local.common_prefix}-efs-sg"
 #   description = "Allow EFS access from VPC subnets"
 
 #   egress {
@@ -85,7 +85,7 @@ resource "aws_security_group_rule" "allow_lb_https_traffic" {
 #   tags = merge(
 #     local.global_tags,
 #     {
-#       "Name" = lower("${var.common_prefix}-efs-sg-${var.environment}")
+#       "Name" = lower("${local.common_prefix}-efs-sg")
 #     }
 #   )
 # }
