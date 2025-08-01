@@ -1,6 +1,8 @@
 locals {
-  docker_swarm_secret_name = "${var.environment}/${local.common_prefix}-join-token/${var.cluster_name}/v1"
-  common_prefix            = "${var.common_prefix}-${var.environment}"
+  docker_swarm_secret_name      = "${var.environment}/docker-join-token/${var.cluster_name}/v1"
+  docker_ca_ssl_secret_name     = "${var.environment}/docker-ca-ssl/${var.cluster_name}/v1"
+  docker_client_ssl_secret_name = "${var.environment}/docker-client-ssl/${var.cluster_name}/v1"
+  common_prefix                 = "${var.common_prefix}-${var.environment}"
   global_tags = {
     environment               = "${var.environment}"
     provisioner               = "terraform"

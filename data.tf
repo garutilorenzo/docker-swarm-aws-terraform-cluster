@@ -8,6 +8,10 @@ data "aws_iam_policy" "AmazonSSMManagedInstanceCore" {
   arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+data "aws_iam_policy" "AutoScalingNotificationAccessRole" {
+  arn = "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
+}
+
 data "template_cloudinit_config" "docker_swarm_cloudinit" {
   gzip          = true
   base64_encode = true
@@ -16,16 +20,19 @@ data "template_cloudinit_config" "docker_swarm_cloudinit" {
     filename     = "init.cfg"
     content_type = "text/cloud-config"
     content = templatefile("${path.module}/files/cloud-config-base.yaml", {
-      init_swarm_py_b64 = filebase64("${path.module}/files/init_swarm.py")
+      init_swarm_py_b64          = filebase64("${path.module}/files/init_swarm.py")
+      setup_docker_ssl_certs_b64 = filebase64("${path.module}/files/setup_docker_ssl_certs.sh")
     })
   }
 
   part {
     content_type = "text/x-shellscript"
     content = templatefile("${path.module}/files/install_docker.sh", {
-      docker_swarm_manager_tag = var.docker_swarm_manager_tag,
-      docker_swarm_worker_tag  = var.docker_swarm_worker_tag,
-      docker_swarm_secret_name = local.docker_swarm_secret_name
+      docker_swarm_manager_tag      = var.docker_swarm_manager_tag,
+      docker_swarm_worker_tag       = var.docker_swarm_worker_tag,
+      docker_swarm_secret_name      = local.docker_swarm_secret_name
+      docker_ca_ssl_secret_name     = local.docker_ca_ssl_secret_name
+      docker_client_ssl_secret_name = local.docker_client_ssl_secret_name
     })
   }
 }

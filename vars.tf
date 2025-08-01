@@ -133,11 +133,6 @@ variable "docker_swarm_worker_tag" {
   default = "docker-swarm-worker"
 }
 
-# variable "default_secret_placeholder" {
-#   type    = string
-#   default = "defaultvalue"
-# }
-
 variable "cluster_name" {
   type        = string
   default     = "ExampleCluster"

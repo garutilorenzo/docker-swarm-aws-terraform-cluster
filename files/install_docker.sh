@@ -44,15 +44,11 @@ install_docker_ubuntu(){
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   sudo apt-get update
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  systemctl enable docker
-  systemctl start docker
 }
 
 preflight_amz(){
   dnf check-update
   dnf install -y jq unzip python3 python3-pip docker
-  systemctl enable docker
-  systemctl start docker
 }
 
 install_aws_cli(){
@@ -78,3 +74,8 @@ if [ ! -d "$${VENV_DIR}" ]; then
 fi
 $${VENV_DIR}/bin/pip3 install boto3 docker
 $${VENV_DIR}/bin/python /usr/local/sbin/init_swarm.py --secret_name ${docker_swarm_secret_name} --manager_tag ${docker_swarm_manager_tag} --worker_tag ${docker_swarm_worker_tag} 
+
+bash /usr/local/sbin/setup_docker_ssl_certs.sh  ${docker_ca_ssl_secret_name} ${docker_client_ssl_secret_name}
+
+systemctl enable docker
+systemctl start docker

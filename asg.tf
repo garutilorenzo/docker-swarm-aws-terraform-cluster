@@ -128,3 +128,29 @@ resource "aws_autoscaling_group" "docker_swarm_workers_asg" {
     aws_secretsmanager_secret.join_secret,
   ]
 }
+
+#######################################
+# Lifecycle Hooks for ASG Termination #
+#######################################
+
+resource "aws_autoscaling_lifecycle_hook" "managers_term_hook" {
+  name                   = "${local.common_prefix}-managers-term-hook"
+  autoscaling_group_name = aws_autoscaling_group.docker_swarm_managers_asg.name
+  default_result         = "CONTINUE"
+  heartbeat_timeout      = 300
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
+
+  notification_target_arn = aws_sqs_queue.ec2_events_queue.arn
+  role_arn                = aws_iam_role.notification_asg_iam_role.arn
+}
+
+resource "aws_autoscaling_lifecycle_hook" "workders_term_hook" {
+  name                   = "${local.common_prefix}-workers-term-hook"
+  autoscaling_group_name = aws_autoscaling_group.docker_swarm_workers_asg.name
+  default_result         = "CONTINUE"
+  heartbeat_timeout      = 300
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
+
+  notification_target_arn = aws_sqs_queue.ec2_events_queue.arn
+  role_arn                = aws_iam_role.notification_asg_iam_role.arn
+}
