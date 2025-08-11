@@ -36,6 +36,22 @@ resource "aws_cloudwatch_event_target" "ec2_spot_interruption_warn_sqs" {
   arn       = aws_sqs_queue.ec2_events_queue.arn
 }
 
+# {
+#   "version": "0",
+#   "id": "5d5555d5-dd55-5555-5555-5555dd55d55d",
+#   "detail-type": "EC2 Instance Rebalance Recommendation",
+#   "source": "aws.ec2",
+#   "account": "123456789012",
+#   "time": "2020-10-26T14:14:14Z",
+#   "region": "us-east-1",
+#   "resources": [
+#     "arn:aws:ec2:us-east-1b:instance/i-0b662ef9931388ba0"
+#   ],
+#   "detail": {
+#     "instance-id": "i-0b662ef9931388ba0"
+#   }
+# }
+
 resource "aws_cloudwatch_event_rule" "ec2_instance_rebalance_recommendation" {
   name        = "${local.common_prefix}-ec2-instance-rebalance-recommendation"
   description = "Capture EC2 Instance Rebalance Recommendation"
@@ -59,6 +75,23 @@ resource "aws_cloudwatch_event_target" "ec2_instance_rebalance_recommendation_sq
   arn       = aws_sqs_queue.ec2_events_queue.arn
 }
 
+# {
+#   "version": "0",
+#   "id": "7bf73129-1428-4cd3-a780-95db273d1602",
+#   "detail-type": "EC2 Instance State-change Notification",
+#   "source": "aws.ec2",
+#   "account": "123456789012",
+#   "time": "2015-11-11T21:29:54Z",
+#   "region": "us-east-1",
+#   "resources": [
+#     "arn:aws:ec2:us-east-1:123456789012:instance/i-abcd1111"
+#   ],
+#   "detail": {
+#     "instance-id": "i-abcd1111",
+#     "state": "pending"
+#   }
+# }
+
 resource "aws_cloudwatch_event_rule" "ec2_instance_state_change_notification" {
   name        = "${local.common_prefix}-ec2-instance-state-change-notification"
   description = "Capture EC2 Instance State-change Notification"
@@ -81,6 +114,35 @@ resource "aws_cloudwatch_event_target" "ec2_instance_state_change_notification_s
   target_id = "SendToSQS"
   arn       = aws_sqs_queue.ec2_events_queue.arn
 }
+
+# {
+#   "version": "0",
+#   "id": "7fb65329-1628-4cf3-a740-95fg457h1402",
+#   "detail-type": "AWS Health Event",
+#   "source": "aws.health",
+#   "account": "account id",
+#   "time": "2016-06-05T06:27:57Z",
+#   "region": "us-east-1",
+#   "resources": ["i-12345678"],
+#   "detail": {
+#     "eventArn": "arn:aws:health:region::event/id",
+#     "service": "EC2",
+#     "eventTypeCode": "AWS_EC2_DEDICATED_HOST_NETWORK_MAINTENANCE_SCHEDULED",
+#     "eventTypeCategory": "scheduledChange",
+#     "startTime": "Sat, 05 Jun 2016 15:10:09 GMT",
+#     "eventDescription": [{
+#       "language": "en_US",
+#       "latestDescription": "A description of the event will be provided here"
+#     }],
+#     "affectedEntities": [{
+#       "entityValue": "i-12345678",
+#       "tags": {
+#         "stage": "prod",
+#         "app": "my-app"
+#       }
+#     }]
+#   }
+# }
 
 resource "aws_cloudwatch_event_rule" "ec2_scheduled_change_notification" {
   name        = "${local.common_prefix}-ec2-scheduled-change-notification"
