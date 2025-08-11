@@ -11,5 +11,5 @@ write_files:
       ${setup_docker_ssl_certs_b64}
     encoding: b64
     owner: root:root
-    path: /usr/local/sbin/setup_docker_ssl_certs.sh
+    path: /usr/local/sbin/setup_docker_ssl_certs.py
     permissions: '0700'

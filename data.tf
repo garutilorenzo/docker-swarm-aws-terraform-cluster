@@ -21,7 +21,7 @@ data "template_cloudinit_config" "docker_swarm_cloudinit" {
     content_type = "text/cloud-config"
     content = templatefile("${path.module}/files/cloud-config-base.yaml", {
       init_swarm_py_b64          = filebase64("${path.module}/files/init_swarm.py")
-      setup_docker_ssl_certs_b64 = filebase64("${path.module}/files/setup_docker_ssl_certs.sh")
+      setup_docker_ssl_certs_b64 = filebase64("${path.module}/files/setup_docker_ssl_certs.py")
     })
   }
 
