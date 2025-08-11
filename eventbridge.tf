@@ -84,7 +84,7 @@ resource "aws_cloudwatch_event_target" "ec2_instance_state_change_notification_s
 
 resource "aws_cloudwatch_event_rule" "ec2_scheduled_change_notification" {
   name        = "${local.common_prefix}-ec2-scheduled-change-notification"
-  description = "Capture EC2 Instance State-change Notification"
+  description = "Capture EC2 scheduled change notifications"
 
   event_pattern = jsonencode({
     source      = ["aws.health"],
