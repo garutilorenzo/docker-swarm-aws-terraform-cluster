@@ -2,6 +2,8 @@
 
 from typing import Tuple, Dict, Any, List, Optional
 
+import sys, json
+from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 
@@ -14,6 +16,29 @@ TOKEN_URL = f"{METADATA_URL}/api/token"
 HEADERS = {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}
 
 logger = logging.getLogger(__name__)
+
+class JsonStdoutHandler(logging.StreamHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        log_entry = {
+            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+            "level": record.levelname.lower(),
+            "message": record.getMessage()
+        }
+        sys.stdout.write(json.dumps(log_entry) + "\n")
+
+def setup_logging(filename) -> None:
+    plain_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    file_handler = logging.FileHandler('/var/log/swarm_init.log')
+    file_handler.setFormatter(plain_formatter)
+    file_handler.setLevel(logging.INFO)
+
+    json_handler = JsonStdoutHandler()
+    json_handler.setLevel(logging.INFO)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(json_handler)
 
 def get_token() -> str:
     try:
@@ -43,7 +68,6 @@ def fetch_instance_info() -> Tuple[str, str, str]:
     region = get_metadata(token, "placement/region")
     logger.info(f"Instance info: IP={private_ip}, ID={instance_id}, Region={region}")
     return private_ip, region, instance_id
-
 
 def tag_instance(instance_id: str, region_name: str, tags: List[Dict[str, str]]) -> None:
     ec2_client = boto3.client("ec2", region_name=region_name)
@@ -81,7 +105,7 @@ def get_oldest_instance_running(region_name: str, tag_keys: List[str]) -> Option
     oldest_instance: Optional[str] = None
     instances: List[str] = []
     while not instances:
-        instances = get_instances_from_tag(region_name, tag_keys)
+        instances = get_instances_from_tag(region_name=region_name, tag_keys=tag_keys)
         if not instances:
             logger.info("Waiting for instances with tag key '%s'...", ','.join(tag_keys))
             time.sleep(5)

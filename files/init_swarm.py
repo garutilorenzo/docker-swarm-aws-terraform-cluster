@@ -7,42 +7,13 @@ from botocore.exceptions import ClientError
 import argparse
 from typing import Tuple, Dict, Any, List, Optional
 import logging
-import sys
-from datetime import datetime
 import time
 
 import ec2_utils
 
-METADATA_URL = "http://169.254.169.254/latest"
-TOKEN_URL = f"{METADATA_URL}/api/token"
-HEADERS = {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}
-
 docker_client  = docker.APIClient()
 
-class JsonStdoutHandler(logging.StreamHandler):
-    def emit(self, record: logging.LogRecord) -> None:
-        log_entry = {
-            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
-            "level": record.levelname.lower(),
-            "message": record.getMessage()
-        }
-        sys.stdout.write(json.dumps(log_entry) + "\n")
-
-def setup_logging() -> None:
-    plain_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    file_handler = logging.FileHandler('/var/log/swarm_init.log')
-    file_handler.setFormatter(plain_formatter)
-    file_handler.setLevel(logging.INFO)
-
-    json_handler = JsonStdoutHandler()
-    json_handler.setLevel(logging.INFO)
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(json_handler)
-
-setup_logging()
+ec2_utils.setup_logging(filename='/var/log/swarm_init.log')
 logger = logging.getLogger(__name__)
 
 def upload_to_secrets_manager(secret_name: str, secret_value: str, region_name: str) -> Optional[Dict[str, Any]]:
@@ -109,7 +80,7 @@ def init_swarm(private_ip: str, instance_id: str, region_name: str) -> Tuple[str
         try:
             response = docker_client.init_swarm(advertise_addr=private_ip, listen_addr=private_ip)
             tags = [
-                {"Key": "docker-swarm-deployed", "Value": "true"},
+                {"Key": "docker-manager-deployed", "Value": "true"},
             ]
             ec2_utils.tag_instance(instance_id=instance_id, region_name=region_name, tags=tags) 
         except Exception as e:
@@ -135,7 +106,7 @@ def join_swarm(remote_addrs: List[str], private_ip: str, join_token: str, instan
             )
             logger.info(f"Joined swarm at {remote_addrs} as {private_ip}.")
             tags = [
-                {"Key": "docker-swarm-deployed", "Value": "true"},
+                {"Key": "docker-worker-deployed", "Value": "true"},
             ]
             ec2_utils.tag_instance(instance_id=instance_id, region_name=region_name, tags=tags) 
         except Exception as e:
@@ -146,7 +117,7 @@ def get_manager_ips(region_name: str, tag_keys: List[str]) -> List[str]:
     instances_ips: List[str] = []
     instances: List[str] = []
     while not instances:
-        instances = ec2_utils.get_instances_from_tag(region_name, tag_keys)
+        instances = ec2_utils.get_instances_from_tag(region_name=region_name, tag_keys=tag_keys)
         if not instances:
             logger.info("Waiting for instances with tag key '%s'...", ','.join(tag_keys))
             time.sleep(5)
@@ -176,11 +147,18 @@ def main(secret_name: str, manager_tag: str, worker_tag: str) -> None:
     
     if oldest_instance == instance_id:
         while not init_swarm_response:
-            init_swarm_response, join_tokens = init_swarm(private_ip, instance_id, region)
+            init_swarm_response, join_tokens = init_swarm(
+                private_ip=private_ip, 
+                instance_id=instance_id, 
+                region_name=region
+            )
         if join_tokens:
-            upload_to_secrets_manager(secret_name, join_tokens, region)
+            upload_to_secrets_manager(secret_name=secret_name, secret_value=join_tokens, region_name=region)
     else:
-        remote_addrs = get_manager_ips(region_name=region, tag_keys=[manager_tag, 'docker-swarm-deployed'])
+        remote_addrs = get_manager_ips(
+            region_name=region, 
+            tag_keys=[manager_tag, 'docker-manager-deployed']
+        )
         join_token_manager: str = ''
         join_token_worker: str = ''
         while not join_token_worker and not join_token_manager:
@@ -193,11 +171,23 @@ def main(secret_name: str, manager_tag: str, worker_tag: str) -> None:
         if join_token_worker and is_worker:
             logger.info(f"Joining swarm as worker with token: {join_token_worker}")
             while not join_worker_response:
-                join_worker_response, SwarnNodeId = join_swarm(remote_addrs, private_ip, join_token_worker, instance_id, region)
+                join_worker_response, SwarnNodeId = join_swarm(
+                    remote_addrs=remote_addrs, 
+                    private_ip=private_ip, 
+                    join_token=join_token_worker, 
+                    instance_id=instance_id, 
+                    region_name=region
+                )
         elif join_token_manager and is_manager:
             logger.info(f"Joining swarm as manager with token: {join_token_manager}")
             while not join_manager_response:
-                join_manager_response, SwarnNodeId = join_swarm(remote_addrs, private_ip, join_token_manager, instance_id, region)
+                join_manager_response, SwarnNodeId = join_swarm(
+                    remote_addrs=remote_addrs, 
+                    private_ip=private_ip, 
+                    join_token=join_token_manager, 
+                    instance_id=instance_id, 
+                    region_name=region
+                )
         else:
             logger.error("No join token found in Secrets Manager.")
 

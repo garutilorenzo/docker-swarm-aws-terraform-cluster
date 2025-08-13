@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, json, base64, socket, ipaddress, sys, time
+import os, json, base64, socket, ipaddress, time
 import boto3
 from botocore.exceptions import ClientError
 import argparse
@@ -22,30 +22,7 @@ CLIENT_DIR = CERTS_DIR / "client"
 DOCKER_OVERRIDE_DIR = Path("/etc/systemd/system/docker.service.d")
 DOCKER_OVERRIDE_FILE = DOCKER_OVERRIDE_DIR / "override.conf"
 
-class JsonStdoutHandler(logging.StreamHandler):
-    def emit(self, record: logging.LogRecord) -> None:
-        log_entry = {
-            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
-            "level": record.levelname.lower(),
-            "message": record.getMessage()
-        }
-        sys.stdout.write(json.dumps(log_entry) + "\n")
-
-def setup_logging() -> None:
-    plain_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    file_handler = logging.FileHandler('/var/log/setup_docker_ssl_certs.log')
-    file_handler.setFormatter(plain_formatter)
-    file_handler.setLevel(logging.INFO)
-
-    json_handler = JsonStdoutHandler()
-    json_handler.setLevel(logging.INFO)
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(json_handler)
-
-setup_logging()
+ec2_utils.setup_logging(filename='/var/log/setup_docker_ssl_certs.log')
 logger = logging.getLogger(__name__)
 
 def get_sm_client(region: str) -> boto3.client:
