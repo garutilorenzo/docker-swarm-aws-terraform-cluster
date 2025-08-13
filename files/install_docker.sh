@@ -72,8 +72,11 @@ if [ ! -d "$${VENV_DIR}" ]; then
     echo "Creating Python venv in $${VENV_DIR}"
     python3 -m venv "$${VENV_DIR}"
 fi
+
 $${VENV_DIR}/bin/pip3 install boto3 docker cryptography
-$${VENV_DIR}/bin/python /usr/local/sbin/setup_docker_ssl_certs.py --ca_secret_name ${docker_swarm_secret_name} --client_secret_name ${docker_client_ssl_secret_name}
+
+export PYTHONPATH=$${PYTHONPATH}:/usr/local/lib/
+$${VENV_DIR}/bin/python /usr/local/sbin/setup_docker_ssl_certs.py --manager_tag ${docker_swarm_manager_tag} --ca_secret_name ${docker_ca_ssl_secret_name} --client_secret_name ${docker_client_ssl_secret_name}
 
 systemctl daemon-reload
 systemctl enable docker

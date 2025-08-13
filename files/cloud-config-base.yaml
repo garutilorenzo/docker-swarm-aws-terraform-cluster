@@ -2,6 +2,12 @@
 
 write_files:
   - content: |
+      ${ec2_utils_py_b64}
+    encoding: b64
+    owner: root:root
+    path: /usr/local/lib/ec2_utils.py
+    permissions: '0644'
+  - content: |
       ${init_swarm_py_b64}
     encoding: b64
     owner: root:root

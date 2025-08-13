@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-import os, json, base64, socket, ipaddress
+import os, json, base64, socket, ipaddress, sys, time
 import boto3
-import requests
+from botocore.exceptions import ClientError
 import argparse
+import logging
+
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
+
+import ec2_utils
 
 # Directories
 CERTS_DIR = Path("/etc/docker/certs")
@@ -18,24 +22,84 @@ CLIENT_DIR = CERTS_DIR / "client"
 DOCKER_OVERRIDE_DIR = Path("/etc/systemd/system/docker.service.d")
 DOCKER_OVERRIDE_FILE = DOCKER_OVERRIDE_DIR / "override.conf"
 
-# -------------------
-# Helper Functions
-# -------------------
-def get_aws_region() -> str:
-    """Retrieve AWS region from EC2 instance metadata."""
-    token = requests.put(
-        "http://169.254.169.254/latest/api/token",
-        headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
-        timeout=3
-    ).text
-    region = requests.get(
-        "http://169.254.169.254/latest/meta-data/placement/region",
-        headers={"X-aws-ec2-metadata-token": token},
-        timeout=3
-    ).text
-    return region
+class JsonStdoutHandler(logging.StreamHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        log_entry = {
+            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+            "level": record.levelname.lower(),
+            "message": record.getMessage()
+        }
+        sys.stdout.write(json.dumps(log_entry) + "\n")
 
-def check_secret_exists(client, secret_name: str) -> bool:
+def setup_logging() -> None:
+    plain_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    file_handler = logging.FileHandler('/var/log/setup_docker_ssl_certs.log')
+    file_handler.setFormatter(plain_formatter)
+    file_handler.setLevel(logging.INFO)
+
+    json_handler = JsonStdoutHandler()
+    json_handler.setLevel(logging.INFO)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(json_handler)
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+def get_sm_client(region: str) -> boto3.client:
+    sm_client = boto3.client("secretsmanager", region_name=region)
+    return sm_client
+
+def wait_for_secret_ca(client: boto3.client, secret_name: str, timeout: int = 900, interval: int = 10) -> bool:
+    """
+    Wait until a secret exists in Secrets Manager and contains a non-empty 'ca' field.
+    
+    Args:
+        client: boto3 Secrets Manager client
+        secret_name: Name of the secret
+        timeout: Maximum wait time in seconds
+        interval: Time in seconds between checks
+        
+    Returns:
+        True if 'ca' field is present before timeout, False otherwise
+    """
+    end_time = time.time() + timeout
+
+    while time.time() < end_time:
+        try:
+            resp = client.get_secret_value(SecretId=secret_name)
+            secret_str = resp.get("SecretString")
+            if not secret_str:
+                time.sleep(interval)
+                continue
+
+            try:
+                data = json.loads(secret_str)
+            except json.JSONDecodeError:
+                time.sleep(interval)
+                continue
+
+            if "ca" in data and data["ca"]:
+                return True
+
+        except client.exceptions.ResourceNotFoundException:
+            # Secret doesn't exist yet
+            time.sleep(interval)
+            continue
+        except ClientError as e:
+            time.sleep(interval)
+            continue
+        except Exception:
+            time.sleep(interval)
+            continue
+
+        time.sleep(interval)
+
+    return False
+
+def check_secret_exists(client: boto3.client, secret_name: str) -> bool:
     """Check if a secret exists and has a 'ca' field."""
     try:
         resp = client.get_secret_value(SecretId=secret_name)
@@ -137,7 +201,7 @@ def upload_secret(client, secret_name: str, data: dict) -> None:
         SecretString=json.dumps(data)
     )
 
-def download_ca(client, secret_name: str) -> None:
+def download_ca(client: boto3.client, secret_name: str) -> None:
     """Download CA cert and key from Secrets Manager."""
     resp = client.get_secret_value(SecretId=secret_name)
     data = json.loads(resp["SecretString"])
@@ -159,15 +223,17 @@ def download_client(client, secret_name: str) -> None:
     with open(CLIENT_DIR / "key.pem", "wb") as f:
         f.write(base64.b64decode(data["client_key"]))
 
-def setup_client_cert(client, ca_secret_name: str, client_secret_name: str) -> None:
+def setup_client_cert(ca_secret_name: str, client_secret_name: str) -> None:
+    private_ip, region, instance_id = ec2_utils.fetch_instance_info()
+    sm_client = boto3.client("secretsmanager", region_name=region)
     user_docker_dir = Path.home() / ".docker"
     os.makedirs(user_docker_dir, exist_ok=True)
-    resp_ca = client.get_secret_value(SecretId=ca_secret_name)
+    resp_ca = sm_client.get_secret_value(SecretId=ca_secret_name)
     data_ca = json.loads(resp_ca["SecretString"])
     with open(user_docker_dir / "ca.pem", "wb") as f:
         f.write(base64.b64decode(data_ca["ca"]))
     
-    resp_client = client.get_secret_value(SecretId=client_secret_name)
+    resp_client = sm_client.get_secret_value(SecretId=client_secret_name)
     data_client = json.loads(resp_client["SecretString"])
     with open(user_docker_dir / "cert.pem", "wb") as f:
         f.write(base64.b64decode(data_client["client"]))
@@ -203,7 +269,11 @@ ExecStart=/usr/bin/dockerd \\
 # -------------------
 # Main
 # -------------------
-def main(sm_client, ca_secret_name: str, client_secret_name: str) -> None:
+def main(ca_secret_name: str, client_secret_name: str, manager_tag: str) -> None:
+    
+    private_ip, region, instance_id = ec2_utils.fetch_instance_info()
+    sm_client = boto3.client("secretsmanager", region_name=region)
+    oldest_instance = ec2_utils.get_oldest_instance_running(region_name=region, tag_keys=[manager_tag])
 
     hostname = socket.gethostname()
     
@@ -212,64 +282,64 @@ def main(sm_client, ca_secret_name: str, client_secret_name: str) -> None:
 
     # Check if CA exists
     if check_secret_exists(sm_client, ca_secret_name):
-        print("CA exists, downloading...")
+        logging.info("CA exists, downloading...")
         download_ca(sm_client, ca_secret_name)
         with open(CA_DIR / "ca.pem", "rb") as f:
             ca_cert = x509.load_pem_x509_certificate(f.read())
         with open(CA_DIR / "ca-key.pem", "rb") as f:
             ca_key = serialization.load_pem_private_key(f.read(), password=None)
     else:
-        print("Generating new CA...")
-        ca_key = generate_private_key()
-        ca_cert = generate_ca_cert(ca_key)
-        save_pem_private_key(ca_key, CA_DIR / "ca-key.pem")
-        save_pem_cert(ca_cert, CA_DIR / "ca.pem")
+        if oldest_instance == instance_id:
+            logging.info("Generating new CA...")
+            ca_key = generate_private_key()
+            ca_cert = generate_ca_cert(ca_key)
+            save_pem_private_key(ca_key, CA_DIR / "ca-key.pem")
+            save_pem_cert(ca_cert, CA_DIR / "ca.pem")
 
-        ca_b64 = base64.b64encode(open(CA_DIR / "ca.pem", "rb").read()).decode()
-        ca_key_b64 = base64.b64encode(open(CA_DIR / "ca-key.pem", "rb").read()).decode()
-        upload_secret(sm_client, ca_secret_name, {"ca": ca_b64, "ca_key": ca_key_b64})
+            ca_b64 = base64.b64encode(open(CA_DIR / "ca.pem", "rb").read()).decode()
+            ca_key_b64 = base64.b64encode(open(CA_DIR / "ca-key.pem", "rb").read()).decode()
+            upload_secret(sm_client, ca_secret_name, {"ca": ca_b64, "ca_key": ca_key_b64})
 
-        print("Generating client cert...")
-        client_key = generate_private_key()
-        client_cert = generate_client_cert(client_key, ca_cert, ca_key)
-        save_pem_private_key(client_key, CLIENT_DIR / "key.pem")
-        save_pem_cert(client_cert, CLIENT_DIR / "cert.pem")
+            logging.info("Generating client cert...")
+            client_key = generate_private_key()
+            client_cert = generate_client_cert(client_key, ca_cert, ca_key)
+            save_pem_private_key(client_key, CLIENT_DIR / "key.pem")
+            save_pem_cert(client_cert, CLIENT_DIR / "cert.pem")
 
-        client_b64 = base64.b64encode(open(CLIENT_DIR / "cert.pem", "rb").read()).decode()
-        client_key_b64 = base64.b64encode(open(CLIENT_DIR / "key.pem", "rb").read()).decode()
-        upload_secret(sm_client, client_secret_name, {"client": client_b64, "client_key": client_key_b64})
+            client_b64 = base64.b64encode(open(CLIENT_DIR / "cert.pem", "rb").read()).decode()
+            client_key_b64 = base64.b64encode(open(CLIENT_DIR / "key.pem", "rb").read()).decode()
+            upload_secret(sm_client, client_secret_name, {"client": client_b64, "client_key": client_key_b64})
+        else:
+            wait_for_secret_ca(client=sm_client, secret_name=ca_secret_name)
 
-    print("Generating server cert...")
+    logging.info("Generating server cert...")
     server_key = generate_private_key()
     server_cert = generate_server_cert(server_key, ca_cert, ca_key, hostname)
     save_pem_private_key(server_key, SERVER_DIR / "server-key.pem")
     save_pem_cert(server_cert, SERVER_DIR / "server-cert.pem")
 
-    print("Docker TLS certs ready.")
+    logging.info("Docker TLS certs ready.")
 
     set_file_permissions()
     configure_docker_tls()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate and manage Docker TLS certs with AWS Secrets Manager.")
-    parser.add_argument("--ca_secret_name", type=str, help="Name of the CA secret in AWS Secrets Manager.")
-    parser.add_argument("--client_secret_name", type=str, help="Name of the client secret in AWS Secrets Manager.")
+    parser.add_argument("--manager_tag", required=True, type=str, help="Tag key for manager instances.")
+    parser.add_argument("--ca_secret_name", required=True, type=str, help="Name of the CA secret in AWS Secrets Manager.")
+    parser.add_argument("--client_secret_name", required=True, type=str, help="Name of the client secret in AWS Secrets Manager.")
     parser.add_argument('--setup-client', action='store_true')
     
-    args = parser.parse_args()
-
-    region = get_aws_region()
-    sm_client = boto3.client("secretsmanager", region_name=region)
+    args = parser.parse_args()    
 
     if args.setup_client:
         setup_client_cert(
-            client=sm_client,
             ca_secret_name=args.ca_secret_name,
             client_secret_name=args.client_secret_name
         )
 
     main(
-        sm_client=sm_client,
         ca_secret_name=args.ca_secret_name, 
-        client_secret_name=args.client_secret_name
+        client_secret_name=args.client_secret_name,
+        manager_tag=args.manager_tag
     )
