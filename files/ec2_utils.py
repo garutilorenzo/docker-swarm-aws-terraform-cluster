@@ -28,7 +28,7 @@ class JsonStdoutHandler(logging.StreamHandler):
 
 def setup_logging(filename) -> None:
     plain_formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    file_handler = logging.FileHandler('/var/log/swarm_init.log')
+    file_handler = logging.FileHandler(filename)
     file_handler.setFormatter(plain_formatter)
     file_handler.setLevel(logging.INFO)
 
