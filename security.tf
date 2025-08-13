@@ -16,7 +16,7 @@ resource "aws_security_group" "docker_swarm_sg" {
 }
 
 resource "aws_security_group_rule" "docker_swarm_ingress_self" {
-  description       = "Allow traffic from the network itself" 
+  description       = "Allow traffic from the network itself"
   type              = "ingress"
   from_port         = 0
   to_port           = 0
@@ -27,7 +27,7 @@ resource "aws_security_group_rule" "docker_swarm_ingress_self" {
 
 resource "aws_security_group_rule" "docker_swarm_ingress_ssh" {
   count             = length(var.my_public_ip_cidrs) > 0 ? 1 : 0
-  description       = "Allow incoming SSH traffic for management IPs" 
+  description       = "Allow incoming SSH traffic for management IPs"
   type              = "ingress"
   from_port         = 22
   to_port           = 22
@@ -37,7 +37,7 @@ resource "aws_security_group_rule" "docker_swarm_ingress_ssh" {
 }
 
 resource "aws_security_group_rule" "docker_swarm_egress_all" {
-  description       = "Allow egress traffic to all destinations" 
+  description       = "Allow egress traffic to all destinations"
   type              = "egress"
   from_port         = 0
   to_port           = 0
@@ -48,7 +48,7 @@ resource "aws_security_group_rule" "docker_swarm_egress_all" {
 
 resource "aws_security_group_rule" "docker_swarm_ingress_from_lb_http" {
   count                    = var.create_extlb ? 1 : 0
-  description              = "Allow incoming HTTP traffic from the public load balancer" 
+  description              = "Allow incoming HTTP traffic from the public load balancer"
   type                     = "ingress"
   from_port                = var.extlb_http_port
   to_port                  = var.extlb_http_port
@@ -59,7 +59,7 @@ resource "aws_security_group_rule" "docker_swarm_ingress_from_lb_http" {
 
 resource "aws_security_group_rule" "docker_swarm_ingress_from_lb_https" {
   count                    = var.create_extlb ? 1 : 0
-  description              = "Allow incoming HTTPS traffic from the public load balancer" 
+  description              = "Allow incoming HTTPS traffic from the public load balancer"
   type                     = "ingress"
   from_port                = var.extlb_https_port
   to_port                  = var.extlb_https_port

@@ -157,7 +157,7 @@ resource "aws_security_group" "public_lb_sg" {
 
 resource "aws_security_group_rule" "public_lb_allow_lb_http_traffic" {
   count             = var.create_extlb ? 1 : 0
-  description       = "Allow incoming HTTP traffic from the internet" 
+  description       = "Allow incoming HTTP traffic from the internet"
   type              = "ingress"
   from_port         = var.extlb_http_port
   to_port           = var.extlb_http_port
@@ -168,7 +168,7 @@ resource "aws_security_group_rule" "public_lb_allow_lb_http_traffic" {
 
 resource "aws_security_group_rule" "public_lb_allow_lb_https_traffic" {
   count             = var.create_extlb ? 1 : 0
-  description       = "Allow incoming HTTPS traffic from the internet" 
+  description       = "Allow incoming HTTPS traffic from the internet"
   type              = "ingress"
   from_port         = var.extlb_https_port
   to_port           = var.extlb_https_port
@@ -179,7 +179,7 @@ resource "aws_security_group_rule" "public_lb_allow_lb_https_traffic" {
 
 resource "aws_security_group_rule" "public_lb_egress_all" {
   count             = var.create_extlb ? 1 : 0
-  description       = "Allow egress traffic to all destinations" 
+  description       = "Allow egress traffic to all destinations"
   type              = "egress"
   from_port         = 0
   to_port           = 0

@@ -35,9 +35,31 @@ resource "aws_sqs_queue_policy" "ec2_events_queue_policy" {
       {
         Effect = "Allow",
         Principal = {
+          Service = "autoscaling.amazonaws.com"
+        },
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = [
+          "${aws_sqs_queue.ec2_events_queue.arn}",
+        ],
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = [
+              "${aws_autoscaling_group.docker_swarm_managers_asg.arn}",
+              "${aws_autoscaling_group.docker_swarm_workers_asg.arn}"
+            ]
+          }
+        }
+      },
+      {
+        Effect = "Allow",
+        Principal = {
           AWS = [
-            "${aws_iam_role.docker_swarm_iam_role.arn}",
-            "${aws_iam_role.notification_asg_iam_role.arn}"
+            "${aws_iam_role.docker_swarm_iam_role.arn}"
           ]
         },
         Action = [

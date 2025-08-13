@@ -83,6 +83,39 @@ resource "aws_iam_policy" "allow_secrets_manager" {
   )
 }
 
+resource "aws_iam_policy" "ec2_tag_policy" {
+  name        = "${local.common_prefix}-ec2-tag-policy"
+  path        = "/"
+  description = "Allow EC2 Tagging Policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateTags"
+        ],
+        Resource = [
+          "*"
+        ],
+        Condition = {
+          StringEquals = {
+            for tag, value in local.global_tags : "aws:ResourceTag/${tag}" => value
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(
+    local.global_tags,
+    {
+      "Name" = lower("${local.common_prefix}-ec2-tag-policy")
+    }
+  )
+}
+
 resource "aws_iam_role_policy_attachment" "attach_ssm_policy" {
   role       = aws_iam_role.docker_swarm_iam_role.name
   policy_arn = data.aws_iam_policy.AmazonSSMManagedInstanceCore.arn
@@ -96,6 +129,11 @@ resource "aws_iam_role_policy_attachment" "attach_ec2_ro_policy" {
 resource "aws_iam_role_policy_attachment" "attach_allow_secrets_manager_policy" {
   role       = aws_iam_role.docker_swarm_iam_role.name
   policy_arn = aws_iam_policy.allow_secrets_manager.arn
+}
+
+resource "aws_iam_role_policy_attachment" "attach_allow_ec2_tag_policy" {
+  role       = aws_iam_role.docker_swarm_iam_role.name
+  policy_arn = aws_iam_policy.ec2_tag_policy.arn
 }
 
 resource "aws_iam_role" "notification_asg_iam_role" {
@@ -124,6 +162,6 @@ resource "aws_iam_role" "notification_asg_iam_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "attach_asg_notification_policy" {
-  role       = aws_iam_role.docker_swarm_iam_role.name
+  role       = aws_iam_role.notification_asg_iam_role.name
   policy_arn = data.aws_iam_policy.AutoScalingNotificationAccessRole.arn
 }
