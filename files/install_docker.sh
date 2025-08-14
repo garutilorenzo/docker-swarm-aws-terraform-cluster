@@ -74,9 +74,9 @@ if [ ! -d "$${VENV_DIR}" ]; then
 fi
 
 TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-REGION_NAME=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/placement/region)
-export AWS_DEFAULT_REGION=$${REGION_NAME}
-export AWS_REGION=$${REGION_NAME}
+AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/placement/region)
+export AWS_DEFAULT_REGION=$${AWS_REGION}
+export AWS_REGION
 
 $${VENV_DIR}/bin/pip3 install boto3 docker cryptography
 
