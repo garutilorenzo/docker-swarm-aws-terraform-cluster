@@ -73,6 +73,10 @@ if [ ! -d "$${VENV_DIR}" ]; then
     python3 -m venv "$${VENV_DIR}"
 fi
 
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+REGION_NAME=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/placement/region)
+export REGION_NAME
+
 $${VENV_DIR}/bin/pip3 install boto3 docker cryptography
 
 export PYTHONPATH=$${PYTHONPATH}:/usr/local/lib/

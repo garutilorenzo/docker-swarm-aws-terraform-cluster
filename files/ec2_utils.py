@@ -2,7 +2,7 @@
 
 from typing import Tuple, Dict, Any, List, Optional
 
-import sys, json
+import sys, json, os
 from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
@@ -14,6 +14,10 @@ import logging
 METADATA_URL = "http://169.254.169.254/latest"
 TOKEN_URL = f"{METADATA_URL}/api/token"
 HEADERS = {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}
+REGION_NAME = os.getenv("AWS_REGION")
+
+secrets_manager_client = boto3.client('secretsmanager', region_name=REGION_NAME)
+ec2_client = boto3.client("ec2", region_name=REGION_NAME)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,36 @@ def setup_logging(filename) -> None:
     root_logger.setLevel(logging.INFO)
     root_logger.addHandler(file_handler)
     root_logger.addHandler(json_handler)
+
+def upload_to_secrets_manager(secret_name: str, secret_value: str) -> Optional[Dict[str, Any]]:
+    response: Dict[str, Any] = {}
+    try:
+        response = secrets_manager_client.put_secret_value(
+            SecretId=secret_name,
+            SecretString=secret_value
+        )
+        logger.info(f"Updated secret {secret_name}.")
+    except ClientError as e:
+        logger.error(f"Error updating secret: {e}")
+    return response
+
+def download_from_secrets_manager(secret_name: str) -> Dict[str, Any]:
+    result: Dict[str, Any] = {}
+    try:
+        response = secrets_manager_client.get_secret_value(
+            SecretId=secret_name,
+        )
+        if response.get('SecretString'):
+            logger.info(f"Trying to json loads {secret_name}")
+            result = json.loads(response['SecretString'])
+    except ClientError as e:
+        logger.error(f"Error downloading secret {secret_name} or {secret_name} not in json format")
+    return result
+
+def get_instance_tags(instance_id: str) -> List[Dict[str, Any]]:
+    response = ec2_client.describe_instances(InstanceIds=[instance_id])
+    tags = response["Reservations"][0]["Instances"][0].get("Tags", [])
+    return tags
 
 def get_token() -> str:
     try:
@@ -69,17 +103,13 @@ def fetch_instance_info() -> Tuple[str, str, str]:
     logger.info(f"Instance info: IP={private_ip}, ID={instance_id}, Region={region}")
     return private_ip, region, instance_id
 
-def tag_instance(instance_id: str, region_name: str, tags: List[Dict[str, str]]) -> None:
-    ec2_client = boto3.client("ec2", region_name=region_name)
-
+def tag_instance(instance_id: str, tags: List[Dict[str, str]]) -> None:
     ec2_client.create_tags(
         Resources=[instance_id],
         Tags=tags
     )
 
-def get_instances_from_tag(region_name: str, tag_keys: List[str]) -> List[str]:
-    ec2_client = boto3.client("ec2", region_name=region_name)
-
+def get_instances_from_tag(tag_keys: List[str]) -> List[str]:
     filters = [{"Name": "instance-state-name", "Values": ["running"]}]
     for tag in tag_keys:
         filters.append({"Name": "tag-key", "Values": [tag]})
@@ -101,11 +131,11 @@ def get_instances_from_tag(region_name: str, tag_keys: List[str]) -> List[str]:
         logger.error(f"Error fetching instances: {e}")
         return []
 
-def get_oldest_instance_running(region_name: str, tag_keys: List[str]) -> Optional[str]:
+def get_oldest_instance_running(tag_keys: List[str]) -> Optional[str]:
     oldest_instance: Optional[str] = None
     instances: List[str] = []
     while not instances:
-        instances = get_instances_from_tag(region_name=region_name, tag_keys=tag_keys)
+        instances = get_instances_from_tag(tag_keys=tag_keys)
         if not instances:
             logger.info("Waiting for instances with tag key '%s'...", ','.join(tag_keys))
             time.sleep(5)

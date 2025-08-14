@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import os, json, base64, socket, ipaddress, time
-import boto3
-from botocore.exceptions import ClientError
 import argparse
 import logging
 
@@ -25,16 +23,11 @@ DOCKER_OVERRIDE_FILE = DOCKER_OVERRIDE_DIR / "override.conf"
 ec2_utils.setup_logging(filename='/var/log/setup_docker_ssl_certs.log')
 logger = logging.getLogger(__name__)
 
-def get_sm_client(region: str) -> boto3.client:
-    sm_client = boto3.client("secretsmanager", region_name=region)
-    return sm_client
-
-def wait_for_secret_ca(client: boto3.client, secret_name: str, timeout: int = 900, interval: int = 10) -> bool:
+def wait_for_secret_ca(secret_name: str, timeout: int = 900, interval: int = 10) -> bool:
     """
     Wait until a secret exists in Secrets Manager and contains a non-empty 'ca' field.
     
     Args:
-        client: boto3 Secrets Manager client
         secret_name: Name of the secret
         timeout: Maximum wait time in seconds
         interval: Time in seconds between checks
@@ -46,47 +39,24 @@ def wait_for_secret_ca(client: boto3.client, secret_name: str, timeout: int = 90
 
     while time.time() < end_time:
         try:
-            resp = client.get_secret_value(SecretId=secret_name)
-            secret_str = resp.get("SecretString")
-            if not secret_str:
-                time.sleep(interval)
-                continue
-
             try:
-                data = json.loads(secret_str)
+                data = ec2_utils.download_from_secrets_manager(secret_name=secret_name)
             except json.JSONDecodeError:
                 time.sleep(interval)
                 continue
-
             if "ca" in data and data["ca"]:
                 return True
-
-        except client.exceptions.ResourceNotFoundException:
-            # Secret doesn't exist yet
-            time.sleep(interval)
-            continue
-        except ClientError as e:
-            time.sleep(interval)
-            continue
         except Exception:
             time.sleep(interval)
             continue
-
         time.sleep(interval)
-
     return False
 
-def check_secret_exists(client: boto3.client, secret_name: str) -> bool:
+def check_secret_exists(secret_name: str) -> bool:
     """Check if a secret exists and has a 'ca' field."""
     try:
-        resp = client.get_secret_value(SecretId=secret_name)
-        secret_str = resp.get("SecretString")
-        if not secret_str:
-            return False
-        data = json.loads(secret_str)
-        return "ca" in data and data["ca"] != ""
-    except client.exceptions.ResourceNotFoundException:
-        return False
+        data = ec2_utils.download_from_secrets_manager(secret_name=secret_name)
+        return "ca" in data and data["ca"]
     except Exception:
         return False
 
@@ -171,17 +141,9 @@ def generate_server_cert(
     )
     return cert
 
-def upload_secret(client, secret_name: str, data: dict) -> None:
-    """Upload a JSON secret to AWS Secrets Manager."""
-    client.put_secret_value(
-        SecretId=secret_name,
-        SecretString=json.dumps(data)
-    )
-
-def download_ca(client: boto3.client, secret_name: str) -> None:
+def download_ca(secret_name: str) -> None:
     """Download CA cert and key from Secrets Manager."""
-    resp = client.get_secret_value(SecretId=secret_name)
-    data = json.loads(resp["SecretString"])
+    data = ec2_utils.download_from_secrets_manager(secret_name=secret_name)
 
     with open(CA_DIR / "ca.pem", "wb") as f:
         f.write(base64.b64decode(data["ca"]))
@@ -189,10 +151,9 @@ def download_ca(client: boto3.client, secret_name: str) -> None:
     with open(CA_DIR / "ca-key.pem", "wb") as f:
         f.write(base64.b64decode(data["ca_key"]))
 
-def download_client(client, secret_name: str) -> None:
+def download_client(secret_name: str) -> None:
     """Download CA cert and key from Secrets Manager."""
-    resp = client.get_secret_value(SecretId=secret_name)
-    data = json.loads(resp["SecretString"])
+    data = ec2_utils.download_from_secrets_manager(secret_name=secret_name)
 
     with open(CLIENT_DIR / "cert.pem", "wb") as f:
         f.write(base64.b64decode(data["client"]))
@@ -201,17 +162,13 @@ def download_client(client, secret_name: str) -> None:
         f.write(base64.b64decode(data["client_key"]))
 
 def setup_client_cert(ca_secret_name: str, client_secret_name: str) -> None:
-    private_ip, region, instance_id = ec2_utils.fetch_instance_info()
-    sm_client = boto3.client("secretsmanager", region_name=region)
     user_docker_dir = Path.home() / ".docker"
     os.makedirs(user_docker_dir, exist_ok=True)
-    resp_ca = sm_client.get_secret_value(SecretId=ca_secret_name)
-    data_ca = json.loads(resp_ca["SecretString"])
+    data_ca = ec2_utils.download_from_secrets_manager(secret_name=ca_secret_name)
     with open(user_docker_dir / "ca.pem", "wb") as f:
         f.write(base64.b64decode(data_ca["ca"]))
     
-    resp_client = sm_client.get_secret_value(SecretId=client_secret_name)
-    data_client = json.loads(resp_client["SecretString"])
+    data_client = ec2_utils.download_from_secrets_manager(secret_name=client_secret_name)
     with open(user_docker_dir / "cert.pem", "wb") as f:
         f.write(base64.b64decode(data_client["client"]))
     with open(user_docker_dir / "key.pem", "wb") as f:
@@ -249,8 +206,7 @@ ExecStart=/usr/bin/dockerd \\
 def main(ca_secret_name: str, client_secret_name: str, manager_tag: str) -> None:
     
     private_ip, region, instance_id = ec2_utils.fetch_instance_info()
-    sm_client = boto3.client("secretsmanager", region_name=region)
-    oldest_instance = ec2_utils.get_oldest_instance_running(region_name=region, tag_keys=[manager_tag])
+    oldest_instance = ec2_utils.get_oldest_instance_running(tag_keys=[manager_tag])
 
     hostname = socket.gethostname()
     
@@ -258,9 +214,9 @@ def main(ca_secret_name: str, client_secret_name: str, manager_tag: str) -> None
         d.mkdir(parents=True, exist_ok=True)
 
     # Check if CA exists
-    if check_secret_exists(sm_client, ca_secret_name):
+    if check_secret_exists(ca_secret_name):
         logging.info("CA exists, downloading...")
-        download_ca(sm_client, ca_secret_name)
+        download_ca(ca_secret_name)
         with open(CA_DIR / "ca.pem", "rb") as f:
             ca_cert = x509.load_pem_x509_certificate(f.read())
         with open(CA_DIR / "ca-key.pem", "rb") as f:
@@ -275,7 +231,11 @@ def main(ca_secret_name: str, client_secret_name: str, manager_tag: str) -> None
 
             ca_b64 = base64.b64encode(open(CA_DIR / "ca.pem", "rb").read()).decode()
             ca_key_b64 = base64.b64encode(open(CA_DIR / "ca-key.pem", "rb").read()).decode()
-            upload_secret(sm_client, ca_secret_name, {"ca": ca_b64, "ca_key": ca_key_b64})
+            ca_secret_value = json.dumps({"ca": ca_b64, "ca_key": ca_key_b64})
+            ec2_utils.upload_to_secrets_manager(
+                secret_name=ca_secret_name, 
+                secret_value=ca_secret_value
+            )
 
             logging.info("Generating client cert...")
             client_key = generate_private_key()
@@ -285,9 +245,13 @@ def main(ca_secret_name: str, client_secret_name: str, manager_tag: str) -> None
 
             client_b64 = base64.b64encode(open(CLIENT_DIR / "cert.pem", "rb").read()).decode()
             client_key_b64 = base64.b64encode(open(CLIENT_DIR / "key.pem", "rb").read()).decode()
-            upload_secret(sm_client, client_secret_name, {"client": client_b64, "client_key": client_key_b64})
+            client_secret_value = json.dumps({"client": client_b64, "client_key": client_key_b64})
+            ec2_utils.upload_to_secrets_manager(
+                secret_name=client_secret_name, 
+                secret_value=client_secret_value
+            )
         else:
-            wait_for_secret_ca(client=sm_client, secret_name=ca_secret_name)
+            wait_for_secret_ca(secret_name=ca_secret_name)
 
     logging.info("Generating server cert...")
     server_key = generate_private_key()
