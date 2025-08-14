@@ -14,10 +14,10 @@ import logging
 METADATA_URL = "http://169.254.169.254/latest"
 TOKEN_URL = f"{METADATA_URL}/api/token"
 HEADERS = {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}
-REGION_NAME = os.getenv("AWS_REGION")
+AWS_REGION = os.getenv("AWS_REGION")
 
-secrets_manager_client = boto3.client('secretsmanager', region_name=REGION_NAME)
-ec2_client = boto3.client("ec2", region_name=REGION_NAME)
+secrets_manager_client = boto3.client('secretsmanager', region_name=AWS_REGION)
+ec2_client = boto3.client("ec2", region_name=AWS_REGION)
 
 logger = logging.getLogger(__name__)
 
