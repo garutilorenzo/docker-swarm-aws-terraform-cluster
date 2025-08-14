@@ -53,7 +53,7 @@ resource "aws_security_group_rule" "docker_swarm_ingress_from_lb_http" {
   from_port                = var.extlb_http_port
   to_port                  = var.extlb_http_port
   protocol                 = "tcp"
-  source_security_group_id = aws_security_group.public_lb_sg[count.index].id
+  cidr_blocks              = ["0.0.0.0/0"]
   security_group_id        = aws_security_group.docker_swarm_sg.id
 }
 
@@ -64,7 +64,7 @@ resource "aws_security_group_rule" "docker_swarm_ingress_from_lb_https" {
   from_port                = var.extlb_https_port
   to_port                  = var.extlb_https_port
   protocol                 = "tcp"
-  source_security_group_id = aws_security_group.public_lb_sg[count.index].id
+  cidr_blocks              = ["0.0.0.0/0"]
   security_group_id        = aws_security_group.docker_swarm_sg.id
 }
 
