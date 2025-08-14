@@ -19,11 +19,11 @@ resource "aws_lb" "external_lb" {
 }
 
 # HTTP
-resource "aws_lb_listener" "external_lb_listener_http" {
-  count             = var.create_extlb ? 1 : 0
+resource "aws_lb_listener" "external_nlb_listener_http" {
+  count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
   load_balancer_arn = aws_lb.external_lb[count.index].arn
 
-  protocol = var.load_balancer_type == "application" ? "HTTP" : "TCP"
+  protocol = "TCP"
   port     = var.extlb_http_port
 
   default_action {
@@ -39,12 +39,37 @@ resource "aws_lb_listener" "external_lb_listener_http" {
   )
 }
 
+resource "aws_lb_listener" "external_alb_listener_http" {
+  count             = var.create_extlb && var.load_balancer_type == "application" ? 1 : 0
+  load_balancer_arn = aws_lb.external_lb[count.index].arn
+
+  port              = var.extlb_http_port
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_302"
+    }
+  }
+
+  tags = merge(
+    local.global_tags,
+    {
+      "Name" = lower("${local.common_prefix}-http-listener")
+    }
+  )
+}
+
 resource "aws_lb_target_group" "external_lb_tg_http" {
   count             = var.create_extlb ? 1 : 0
   port              = var.extlb_http_port
   protocol          = var.load_balancer_type == "application" ? "HTTP" : "TCP"
   vpc_id            = var.vpc_id
-  proxy_protocol_v2 = true
+  proxy_protocol_v2 = var.load_balancer_type == "application" ? false : true
 
   depends_on = [
     aws_lb.external_lb
@@ -90,7 +115,7 @@ resource "aws_lb_listener" "external_lb_listener_https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.external_lb_tg_https[count.index].arn
+    target_group_arn =  var.load_balancer_type == "application" ? aws_lb_target_group.external_lb_tg_http[count.index].arn : aws_lb_target_group.external_lb_tg_https[count.index].arn
   }
 
   tags = merge(
@@ -102,9 +127,9 @@ resource "aws_lb_listener" "external_lb_listener_https" {
 }
 
 resource "aws_lb_target_group" "external_lb_tg_https" {
-  count             = var.create_extlb ? 1 : 0
+  count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
   port              = var.extlb_https_port
-  protocol          = var.load_balancer_type == "application" ? "HTTPS" : "TCP"
+  protocol          = "TCP"
   vpc_id            = var.vpc_id
   proxy_protocol_v2 = true
 
@@ -113,9 +138,7 @@ resource "aws_lb_target_group" "external_lb_tg_https" {
   ]
 
   health_check {
-    protocol = var.load_balancer_type == "application" ? "HTTPS" : "TCP"
-    path     = var.load_balancer_type == "application" ? "/ping" : null
-    matcher  = var.load_balancer_type == "application" ? 200 : null
+    protocol = "TCP"
   }
 
   lifecycle {
@@ -131,7 +154,7 @@ resource "aws_lb_target_group" "external_lb_tg_https" {
 }
 
 resource "aws_autoscaling_attachment" "target_https" {
-  count = var.create_extlb ? 1 : 0
+  count  = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
   depends_on = [
     aws_autoscaling_group.docker_swarm_workers_asg,
     aws_lb_target_group.external_lb_tg_https
