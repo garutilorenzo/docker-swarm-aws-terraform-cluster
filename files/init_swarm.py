@@ -9,6 +9,9 @@ import time
 
 import ec2_utils
 
+DOCKER_MANAGER_TAG = 'docker-manager-deployed'
+DOCKER_WORKER_TAG = 'docker-worker-deployed'
+
 docker_client  = docker.APIClient()
 
 ec2_utils.setup_logging(filename='/var/log/swarm_init.log')
@@ -51,7 +54,7 @@ def init_swarm(private_ip: str, instance_id: str) -> Tuple[str, str]:
         try:
             response = docker_client.init_swarm(advertise_addr=private_ip, listen_addr=private_ip)
             tags = [
-                {"Key": "docker-manager-deployed", "Value": "true"},
+                {"Key": f"{DOCKER_MANAGER_TAG}", "Value": "true"},
             ]
             ec2_utils.tag_instance(instance_id=instance_id, tags=tags) 
         except Exception as e:
@@ -62,7 +65,7 @@ def init_swarm(private_ip: str, instance_id: str) -> Tuple[str, str]:
             json_tokens = json.dumps(JoinTokens) 
     return response, json_tokens
 
-def join_swarm(remote_addrs: List[str], private_ip: str, join_token: str, instance_id: str) -> Tuple[str, str]:
+def join_swarm(remote_addrs: List[str], private_ip: str, join_token: str, instance_id: str, instance_tag: str) -> Tuple[str, str]:
     SwarnNodeId = get_node_details()
     response = None
     if SwarnNodeId:
@@ -77,7 +80,7 @@ def join_swarm(remote_addrs: List[str], private_ip: str, join_token: str, instan
             )
             logger.info(f"Joined swarm at {remote_addrs} as {private_ip}.")
             tags = [
-                {"Key": "docker-worker-deployed", "Value": "true"},
+                {"Key": f"{instance_tag}", "Value": "true"},
             ]
             ec2_utils.tag_instance(instance_id=instance_id, tags=tags) 
         except Exception as e:
@@ -120,7 +123,7 @@ def main(secret_name: str, manager_tag: str, worker_tag: str) -> None:
             ec2_utils.upload_to_secrets_manager(secret_name=secret_name, secret_value=join_tokens)
     else:
         remote_addrs = get_manager_ips(
-            tag_keys=[manager_tag, 'docker-manager-deployed']
+            tag_keys=[manager_tag, f"{DOCKER_MANAGER_TAG}"]
         )
         join_token_manager: str = ''
         join_token_worker: str = ''
@@ -138,7 +141,8 @@ def main(secret_name: str, manager_tag: str, worker_tag: str) -> None:
                     remote_addrs=remote_addrs, 
                     private_ip=private_ip, 
                     join_token=join_token_worker, 
-                    instance_id=instance_id, 
+                    instance_id=instance_id,
+                    instance_tag=DOCKER_WORKER_TAG
                 )
         elif join_token_manager and is_manager:
             logger.info(f"Joining swarm as manager with token: {join_token_manager}")
@@ -147,7 +151,8 @@ def main(secret_name: str, manager_tag: str, worker_tag: str) -> None:
                     remote_addrs=remote_addrs, 
                     private_ip=private_ip, 
                     join_token=join_token_manager, 
-                    instance_id=instance_id, 
+                    instance_id=instance_id,
+                    instance_tag=DOCKER_MANAGER_TAG
                 )
         else:
             logger.error("No join token found in Secrets Manager.")
