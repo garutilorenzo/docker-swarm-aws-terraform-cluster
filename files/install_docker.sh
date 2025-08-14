@@ -73,8 +73,8 @@ if [ ! -d "$${VENV_DIR}" ]; then
     python3 -m venv "$${VENV_DIR}"
 fi
 
-TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/placement/region)
+METADATA_TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+AWS_REGION=$(curl -H "X-aws-ec2-metadata-token: $METADATA_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
 export AWS_DEFAULT_REGION=$${AWS_REGION}
 export AWS_REGION
 
