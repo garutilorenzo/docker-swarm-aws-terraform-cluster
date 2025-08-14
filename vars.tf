@@ -59,11 +59,13 @@ variable "instance_types" {
   type        = map(string)
   default = {
     asg_instance_type_1 = "t3.medium"
-    asg_instance_type_2 = "t3a.medium"
+    asg_instance_type_2 = "t2.medium"
     asg_instance_type_3 = "c5.large"
-    asg_instance_type_4 = "c6a.large"
+    asg_instance_type_4 = "c5d.large"
     asg_instance_type_5 = "c6i.large"
-    asg_instance_type_6 = "c7i.large"
+    asg_instance_type_6 = "c6id.large"
+    asg_instance_type_7 = "c7i.large"
+    asg_instance_type_8 = "c7i-flex.large"
   }
 }
 
