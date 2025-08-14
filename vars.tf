@@ -141,3 +141,28 @@ variable "cluster_name" {
   default     = "ExampleCluster"
   description = "Docker swarm cluster name used in AWS resource tagging"
 }
+
+variable "load_balancer_type" {
+  description = "Public load balancer type. Must be either 'network' or 'application'."
+  type        = string
+  default     = "network"
+
+  validation {
+    condition     = contains(["network", "application"], var.load_balancer_type)
+    error_message = "The environment must be either 'network' or 'application'."
+  }
+}
+
+variable "alb_certificate_arn" {
+  description = "ARN of the ACM certificate. Required if load_balancer_type = application."
+  type        = string
+  default     = null
+
+  validation {
+    condition = (
+      var.load_balancer_type != "application" ||
+      (var.load_balancer_type == "application" && var.alb_certificate_arn != null && var.alb_certificate_arn != "")
+    )
+    error_message = "alb_certificate_arn must be set when load_balancer_type is 'application'."
+  }
+}

@@ -46,25 +46,47 @@ resource "aws_security_group_rule" "docker_swarm_egress_all" {
   security_group_id = aws_security_group.docker_swarm_sg.id
 }
 
-resource "aws_security_group_rule" "docker_swarm_ingress_from_lb_http" {
-  count                    = var.create_extlb ? 1 : 0
+resource "aws_security_group_rule" "docker_swarm_ingress_from_nlb_http" {
+  count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
+  description       = "Allow incoming HTTP traffic from the public load balancer"
+  type              = "ingress"
+  from_port         = var.extlb_http_port
+  to_port           = var.extlb_http_port
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.docker_swarm_sg.id
+}
+
+resource "aws_security_group_rule" "docker_swarm_ingress_from_nlb_https" {
+  count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
+  description       = "Allow incoming HTTPS traffic from the public load balancer"
+  type              = "ingress"
+  from_port         = var.extlb_https_port
+  to_port           = var.extlb_https_port
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.docker_swarm_sg.id
+}
+
+resource "aws_security_group_rule" "docker_swarm_ingress_from_alb_http" {
+  count                    = var.create_extlb && var.load_balancer_type == "application" ? 1 : 0
   description              = "Allow incoming HTTP traffic from the public load balancer"
   type                     = "ingress"
   from_port                = var.extlb_http_port
   to_port                  = var.extlb_http_port
   protocol                 = "tcp"
-  cidr_blocks              = ["0.0.0.0/0"]
+  source_security_group_id = aws_security_group.public_lb_sg[count.index].id
   security_group_id        = aws_security_group.docker_swarm_sg.id
 }
 
-resource "aws_security_group_rule" "docker_swarm_ingress_from_lb_https" {
-  count                    = var.create_extlb ? 1 : 0
+resource "aws_security_group_rule" "docker_swarm_ingress_from_alb_https" {
+  count                    = var.create_extlb && var.load_balancer_type == "application" ? 1 : 0
   description              = "Allow incoming HTTPS traffic from the public load balancer"
   type                     = "ingress"
   from_port                = var.extlb_https_port
   to_port                  = var.extlb_https_port
   protocol                 = "tcp"
-  cidr_blocks              = ["0.0.0.0/0"]
+  source_security_group_id = aws_security_group.public_lb_sg[count.index].id
   security_group_id        = aws_security_group.docker_swarm_sg.id
 }
 
