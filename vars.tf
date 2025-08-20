@@ -4,6 +4,7 @@ variable "environment" {
 
 variable "ssk_key_pair_name" {
   type = string
+  default = ""
 }
 
 variable "vpc_id" {
@@ -144,7 +145,7 @@ variable "cluster_name" {
 variable "load_balancer_type" {
   description = "Public load balancer type. Must be either 'network' or 'application'."
   type        = string
-  default     = "network"
+  default     = "application"
 
   validation {
     condition     = contains(["network", "application"], var.load_balancer_type)
@@ -168,7 +169,7 @@ variable "alb_certificate_arn" {
 
 variable "deploy_traefik" {
   type        = bool
-  default     = true
+  default     = false
   description = "Deploy Traefik as a reverse proxy"
 }
 
