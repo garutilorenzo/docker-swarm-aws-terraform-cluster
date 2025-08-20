@@ -89,5 +89,7 @@ systemctl restart docker
 
 $${VENV_DIR}/bin/python /usr/local/sbin/init_swarm.py --secret-name ${docker_swarm_secret_name} --manager-tag ${docker_swarm_manager_tag} --worker-tag ${docker_swarm_worker_tag} 
 
+%{ if deploy_traefik }
 TRAEFIK_DASHBOARD_BLOCK="%{ if expose_traefik_dashboard }--expose-traefik-dashboard --traefik-dashboard-fqdn ${traefik_dashboard_fqdn} --traefik-dashboard-username ${traefik_dashboard_username} --traefik-dashboard-password ${traefik_dashboard_password}%{ endif }"
 $${VENV_DIR}/bin/python /usr/local/sbin/deploy_traefik.py --manager-tag ${docker_swarm_manager_tag} --traefik-forwarded-headers-trusted-ips ${traefik_forwarded_headers_trusted_ips} $${TRAEFIK_DASHBOARD_BLOCK} %{ if traefik_dashboard_ip_whitelist != "" }--traefik-dashboard-ip-whitelist ${traefik_dashboard_ip_whitelist} %{ endif }
+%{ endif }

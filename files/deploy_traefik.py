@@ -44,7 +44,7 @@ def create_service(args):
         "--ping.entrypoint=web"
     ]
     if args.traefik_forwarded_headers_trusted_ips:
-        container_command_args.append(f"--entrypoints.web.forwardedHeaders.trustedIPs={args.traefik_forwarded_headers_trusted_ips}")
+        container_command_args.append(f"--entrypoints.web.forwardedHeaders.trustedIPs=10.0.0.0/8,{args.traefik_forwarded_headers_trusted_ips}")
 
     # Ports mapping
     endpoint_spec = docker.types.EndpointSpec(ports={args.traefik_node_port: 80})
