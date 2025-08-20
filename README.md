@@ -96,3 +96,5 @@ terraform destroy
 This version of the infrastructure provides some EventBridge rules that capture EC2 interruptions and sends the events to an SQS queue. On a future release the messages will be parsed from a daemon (running directly on the nodes or a lambda funcion) to handle instance interruption (spot interruption, insance rebalance, instance state change, EC2 scheduled change)
 
 Add support for Traefik and Network load balancer
+
+Add EFS support for persistent storage
