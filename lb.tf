@@ -1,3 +1,7 @@
+############################################
+##### Main Load Balancer Configuration #####
+############################################
+
 resource "aws_lb" "external_lb" {
   count              = var.create_extlb ? 1 : 0
   name               = "${local.common_prefix}-ext-lb"
@@ -18,7 +22,11 @@ resource "aws_lb" "external_lb" {
   )
 }
 
-# HTTP
+############################################
+#####        HTTP CONFIGURATION        #####
+############################################
+
+# NLB listener: if the load_balancer_type is network we forward HTTP traffic to the target group
 resource "aws_lb_listener" "external_nlb_listener_http" {
   count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
   load_balancer_arn = aws_lb.external_lb[count.index].arn
@@ -39,12 +47,13 @@ resource "aws_lb_listener" "external_nlb_listener_http" {
   )
 }
 
+# ALB Listener: if the load_balancer_type is application we redirect HTTP traffic to HTTPS
 resource "aws_lb_listener" "external_alb_listener_http" {
   count             = var.create_extlb && var.load_balancer_type == "application" ? 1 : 0
   load_balancer_arn = aws_lb.external_lb[count.index].arn
 
-  port              = var.extlb_http_port
-  protocol          = "HTTP"
+  port     = var.extlb_http_port
+  protocol = "HTTP"
 
   default_action {
     type = "redirect"
@@ -64,6 +73,7 @@ resource "aws_lb_listener" "external_alb_listener_http" {
   )
 }
 
+# Dynamic config for the target group based on the load balancer typ
 resource "aws_lb_target_group" "external_lb_tg_http" {
   count             = var.create_extlb ? 1 : 0
   port              = var.extlb_http_port
@@ -104,7 +114,14 @@ resource "aws_autoscaling_attachment" "target_http" {
   lb_target_group_arn    = aws_lb_target_group.external_lb_tg_http[count.index].arn
 }
 
-# HTTPS
+############################################
+#####        HTTPS CONFIGURATION       #####
+############################################
+
+# Dynamic config for the HTTPS listener based on the load balancer type
+# If the load_balancer_type is application we use HTTPS and we configure the certificate_arn (external, not managed by this module)
+# If the load_balancer_type is application we forward the HTTPS traffic to the target HTTP target group (Traefick will listen only on HTTP)
+
 resource "aws_lb_listener" "external_lb_listener_https" {
   count             = var.create_extlb ? 1 : 0
   load_balancer_arn = aws_lb.external_lb[count.index].arn
@@ -115,7 +132,7 @@ resource "aws_lb_listener" "external_lb_listener_https" {
 
   default_action {
     type             = "forward"
-    target_group_arn =  var.load_balancer_type == "application" ? aws_lb_target_group.external_lb_tg_http[count.index].arn : aws_lb_target_group.external_lb_tg_https[count.index].arn
+    target_group_arn = var.load_balancer_type == "application" ? aws_lb_target_group.external_lb_tg_http[count.index].arn : aws_lb_target_group.external_lb_tg_https[count.index].arn
   }
 
   tags = merge(
@@ -126,6 +143,7 @@ resource "aws_lb_listener" "external_lb_listener_https" {
   )
 }
 
+# We need to create the HTTPS target group only if the load_balancer_type is network
 resource "aws_lb_target_group" "external_lb_tg_https" {
   count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
   port              = var.extlb_https_port
@@ -154,7 +172,7 @@ resource "aws_lb_target_group" "external_lb_tg_https" {
 }
 
 resource "aws_autoscaling_attachment" "target_https" {
-  count  = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
+  count = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
   depends_on = [
     aws_autoscaling_group.docker_swarm_workers_asg,
     aws_lb_target_group.external_lb_tg_https
