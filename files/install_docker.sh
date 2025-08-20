@@ -78,13 +78,16 @@ AWS_REGION=$(curl -H "X-aws-ec2-metadata-token: $METADATA_TOKEN" http://169.254.
 export AWS_DEFAULT_REGION=$${AWS_REGION}
 export AWS_REGION
 
-$${VENV_DIR}/bin/pip3 install boto3 docker cryptography
+$${VENV_DIR}/bin/pip3 install boto3 docker cryptography bcrypt
 
 export PYTHONPATH=$${PYTHONPATH}:/usr/local/lib/
-$${VENV_DIR}/bin/python /usr/local/sbin/setup_docker_ssl_certs.py --manager_tag ${docker_swarm_manager_tag} --ca_secret_name ${docker_ca_ssl_secret_name} --client_secret_name ${docker_client_ssl_secret_name}
+$${VENV_DIR}/bin/python /usr/local/sbin/setup_docker_ssl_certs.py --manager-tag ${docker_swarm_manager_tag} --ca-secret-name ${docker_ca_ssl_secret_name} --client-secret-name ${docker_client_ssl_secret_name}
 
 systemctl daemon-reload
 systemctl enable docker
 systemctl restart docker
 
-$${VENV_DIR}/bin/python /usr/local/sbin/init_swarm.py --secret_name ${docker_swarm_secret_name} --manager_tag ${docker_swarm_manager_tag} --worker_tag ${docker_swarm_worker_tag} 
+$${VENV_DIR}/bin/python /usr/local/sbin/init_swarm.py --secret-name ${docker_swarm_secret_name} --manager-tag ${docker_swarm_manager_tag} --worker-tag ${docker_swarm_worker_tag} 
+
+TRAEFIK_DASHBOARD_BLOCK="%{ if expose_traefik_dashboard }--expose-traefik-dashboard --traefik-dashboard-fqdn ${traefik_dashboard_fqdn} --traefik-dashboard-username ${traefik_dashboard_username} --traefik-dashboard-password ${traefik_dashboard_password}%{ endif }"
+$${VENV_DIR}/bin/python /usr/local/sbin/deploy_traefik.py --manager-tag ${docker_swarm_manager_tag} --traefik-forwarded-headers-trusted-ips ${traefik_forwarded_headers_trusted_ips} $${TRAEFIK_DASHBOARD_BLOCK} %{ if traefik_dashboard_ip_whitelist != "" }--traefik-dashboard-ip-whitelist ${traefik_dashboard_ip_whitelist} %{ endif }

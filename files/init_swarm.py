@@ -159,8 +159,8 @@ def main(secret_name: str, manager_tag: str, worker_tag: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Initialize or join Docker Swarm on EC2.")
-    parser.add_argument("--secret_name", required=True, type=str, help="Name of the AWS Secrets Manager secret.")
-    parser.add_argument("--manager_tag", required=True, type=str, help="Tag key for manager instances.")
-    parser.add_argument("--worker_tag", required=True, type=str, help="Tag key for worker instances.")
+    parser.add_argument("--secret-name", required=True, type=str, help="Name of the AWS Secrets Manager secret.")
+    parser.add_argument("--manager-tag", required=True, type=str, help="Tag key for manager instances.")
+    parser.add_argument("--worker-tag", required=True, type=str, help="Tag key for worker instances.")
     args = parser.parse_args()
     main(args.secret_name, args.manager_tag, args.worker_tag)

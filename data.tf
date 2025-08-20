@@ -21,6 +21,7 @@ data "template_cloudinit_config" "docker_swarm_cloudinit" {
     content_type = "text/cloud-config"
     content = templatefile("${path.module}/files/cloud-config-base.yaml", {
       ec2_utils_py_b64           = filebase64("${path.module}/files/ec2_utils.py")
+      deploy_traefik_py_b64      = filebase64("${path.module}/files/deploy_traefik.py")
       init_swarm_py_b64          = filebase64("${path.module}/files/init_swarm.py")
       setup_docker_ssl_certs_b64 = filebase64("${path.module}/files/setup_docker_ssl_certs.py")
     })
@@ -29,11 +30,18 @@ data "template_cloudinit_config" "docker_swarm_cloudinit" {
   part {
     content_type = "text/x-shellscript"
     content = templatefile("${path.module}/files/install_docker.sh", {
-      docker_swarm_manager_tag      = var.docker_swarm_manager_tag,
-      docker_swarm_worker_tag       = var.docker_swarm_worker_tag,
-      docker_swarm_secret_name      = local.docker_swarm_secret_name
-      docker_ca_ssl_secret_name     = local.docker_ca_ssl_secret_name
-      docker_client_ssl_secret_name = local.docker_client_ssl_secret_name
+      docker_swarm_manager_tag              = var.docker_swarm_manager_tag,
+      docker_swarm_worker_tag               = var.docker_swarm_worker_tag,
+      docker_swarm_secret_name              = local.docker_swarm_secret_name
+      docker_ca_ssl_secret_name             = local.docker_ca_ssl_secret_name
+      docker_client_ssl_secret_name         = local.docker_client_ssl_secret_name
+      deploy_traefik                        = var.deploy_traefik
+      expose_traefik_dashboard              = var.expose_traefik_dashboard
+      traefik_forwarded_headers_trusted_ips = var.vpc_subnet_cidr
+      traefik_dashboard_fqdn                = var.traefik_dashboard_fqdn
+      traefik_dashboard_username            = var.traefik_dashboard_username
+      traefik_dashboard_password            = var.traefik_dashboard_password
+      traefik_dashboard_ip_whitelist        = var.traefik_dashboard_ip_whitelist
     })
   }
 }

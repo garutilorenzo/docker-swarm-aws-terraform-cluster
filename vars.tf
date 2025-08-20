@@ -165,3 +165,54 @@ variable "alb_certificate_arn" {
     error_message = "alb_certificate_arn must be set when load_balancer_type is 'application'."
   }
 }
+
+variable "deploy_traefik" {
+  type        = bool
+  default     = true
+  description = "Deploy Traefik as a reverse proxy"
+}
+
+variable "expose_traefik_dashboard" {
+  type        = bool
+  default     = false
+  description = "Expose Traefik dashboard"
+}
+
+variable "traefik_dashboard_fqdn" {
+  type        = string
+  default     = ""
+  description = "FQDN for Traefik dashboard"
+
+  validation {
+    condition     = var.expose_traefik_dashboard ? (var.traefik_dashboard_fqdn != "") : true
+    error_message = "traefik_dashboard_fqdn must be set when expose_traefik_dashboard is true."
+  }
+}
+
+variable "traefik_dashboard_username" {
+  type        = string
+  default     = ""
+  description = "Username for Traefik dashboard"
+
+  validation {
+    condition     = var.expose_traefik_dashboard ? (var.traefik_dashboard_username != "") : true
+    error_message = "traefik_dashboard_username must be set when expose_traefik_dashboard is true."
+  }
+}
+
+variable "traefik_dashboard_password" {
+  type        = string
+  default     = ""
+  description = "Password for Traefik dashboard"
+
+  validation {
+    condition     = var.expose_traefik_dashboard ? (var.traefik_dashboard_password != "") : true
+    error_message = "traefik_dashboard_password must be set when expose_traefik_dashboard is true."
+  }
+}
+
+variable "traefik_dashboard_ip_whitelist" {
+  type        = string
+  default     = ""
+  description = "Comma-separated list of IPs to whitelist for Traefik dashboard"
+}

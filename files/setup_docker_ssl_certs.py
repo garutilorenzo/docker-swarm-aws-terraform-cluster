@@ -266,9 +266,9 @@ def main(ca_secret_name: str, client_secret_name: str, manager_tag: str) -> None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate and manage Docker TLS certs with AWS Secrets Manager.")
-    parser.add_argument("--manager_tag", required=True, type=str, help="Tag key for manager instances.")
-    parser.add_argument("--ca_secret_name", required=True, type=str, help="Name of the CA secret in AWS Secrets Manager.")
-    parser.add_argument("--client_secret_name", required=True, type=str, help="Name of the client secret in AWS Secrets Manager.")
+    parser.add_argument("--manager-tag", required=True, type=str, help="Tag key for manager instances.")
+    parser.add_argument("--ca-secret-name", required=True, type=str, help="Name of the CA secret in AWS Secrets Manager.")
+    parser.add_argument("--client-secret-name", required=True, type=str, help="Name of the client secret in AWS Secrets Manager.")
     parser.add_argument('--setup-client', action='store_true')
     
     args = parser.parse_args()    
