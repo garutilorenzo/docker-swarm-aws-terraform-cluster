@@ -2,8 +2,8 @@ resource "aws_secretsmanager_secret" "join_secret" {
   name        = local.docker_swarm_secret_name
   description = "Docker swarm join tokens cluster name: ${var.cluster_name} environment: ${var.environment}"
 
-  # TODO
-  recovery_window_in_days = 0
+  # Set to 0 for testing
+  # recovery_window_in_days = 0
 
   tags = merge(
     local.global_tags,
@@ -17,8 +17,8 @@ resource "aws_secretsmanager_secret" "docker_ca_ssl_secret" {
   name        = local.docker_ca_ssl_secret_name
   description = "SSL CA for Docker cluster name: ${var.cluster_name} environment: ${var.environment}"
 
-  # TODO
-  recovery_window_in_days = 0
+  # Set to 0 for testing
+  # recovery_window_in_days = 0
 
   tags = merge(
     local.global_tags,
@@ -32,8 +32,8 @@ resource "aws_secretsmanager_secret" "docker_client_ssl_secret" {
   name        = local.docker_client_ssl_secret_name
   description = "SSL Client certificate cluster name: ${var.cluster_name} environment: ${var.environment}"
 
-  # TODO
-  recovery_window_in_days = 0
+  # Set to 0 for testing
+  # recovery_window_in_days = 0
 
   tags = merge(
     local.global_tags,
