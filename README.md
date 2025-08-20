@@ -14,7 +14,9 @@ Deploy in a few minutes an high available [Docker Swarm](https://docs.docker.com
   - [Requirements](#requirements)
   - [Before you start](#before-you-start)
   - [Pre flight checklist](#pre-flight-checklist)
+  - [Notes about the infrastructure](#notes-about-the-infrastructure)
   - [Clean up](#clean-up)
+  - [TBD](#tbd)
 
 ## Requirements
 
