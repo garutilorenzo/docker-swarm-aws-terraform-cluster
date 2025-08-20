@@ -36,6 +36,9 @@ AWS_ACCESS_KEY = "xxxxxxxxxxxxxxxxx"
 AWS_SECRET_KEY = "xxxxxxxxxxxxxxxxx"
 ```
 
+If you choose to deploy the public load balancer and you use the Application Load Balancer (default) you need a [public certificate](https://docs.aws.amazon.com/acm/latest/userguide/acm-public-certificates.html).
+Once required and validated get the ARN and set the `alb_certificate_arn` variable of this module.
+
 edit the main.tf file under the [examples](examples/) folder and set the following variables:
 
 | Var   | Required | Desc |
