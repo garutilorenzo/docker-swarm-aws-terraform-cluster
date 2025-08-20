@@ -1,7 +1,7 @@
 resource "aws_security_group" "docker_swarm_sg" {
   vpc_id      = var.vpc_id
-  name        = "docker_swarm_sg"
-  description = "Docker Swarm ingress rules"
+  name        = lower("${local.common_prefix}-allow-strict")
+  description = "Allow strict access to the docker swarm cluster"
 
   lifecycle {
     create_before_destroy = true
@@ -10,12 +10,13 @@ resource "aws_security_group" "docker_swarm_sg" {
   tags = merge(
     local.global_tags,
     {
-      "Name" = lower("${var.common_prefix}-allow-strict-${var.environment}")
+      "Name" = lower("${local.common_prefix}-allow-strict")
     }
   )
 }
 
-resource "aws_security_group_rule" "ingress_self" {
+resource "aws_security_group_rule" "docker_swarm_ingress_self" {
+  description       = "Allow traffic from the network itself"
   type              = "ingress"
   from_port         = 0
   to_port           = 0
@@ -24,16 +25,19 @@ resource "aws_security_group_rule" "ingress_self" {
   security_group_id = aws_security_group.docker_swarm_sg.id
 }
 
-resource "aws_security_group_rule" "ingress_ssh" {
+resource "aws_security_group_rule" "docker_swarm_ingress_ssh" {
+  count             = length(var.my_public_ip_cidrs) > 0 ? 1 : 0
+  description       = "Allow incoming SSH traffic for management IPs"
   type              = "ingress"
   from_port         = 22
   to_port           = 22
   protocol          = "tcp"
-  cidr_blocks       = [var.my_public_ip_cidr]
+  cidr_blocks       = var.my_public_ip_cidrs
   security_group_id = aws_security_group.docker_swarm_sg.id
 }
 
-resource "aws_security_group_rule" "egress_all" {
+resource "aws_security_group_rule" "docker_swarm_egress_all" {
+  description       = "Allow egress traffic to all destinations"
   type              = "egress"
   from_port         = 0
   to_port           = 0
@@ -42,8 +46,9 @@ resource "aws_security_group_rule" "egress_all" {
   security_group_id = aws_security_group.docker_swarm_sg.id
 }
 
-resource "aws_security_group_rule" "allow_lb_http_traffic" {
-  count             = var.create_extlb ? 1 : 0
+resource "aws_security_group_rule" "docker_swarm_ingress_from_nlb_http" {
+  count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
+  description       = "Allow incoming HTTP traffic from the public load balancer"
   type              = "ingress"
   from_port         = var.extlb_http_port
   to_port           = var.extlb_http_port
@@ -52,8 +57,9 @@ resource "aws_security_group_rule" "allow_lb_http_traffic" {
   security_group_id = aws_security_group.docker_swarm_sg.id
 }
 
-resource "aws_security_group_rule" "allow_lb_https_traffic" {
-  count             = var.create_extlb ? 1 : 0
+resource "aws_security_group_rule" "docker_swarm_ingress_from_nlb_https" {
+  count             = var.create_extlb && var.load_balancer_type == "network" ? 1 : 0
+  description       = "Allow incoming HTTPS traffic from the public load balancer"
   type              = "ingress"
   from_port         = var.extlb_https_port
   to_port           = var.extlb_https_port
@@ -62,10 +68,32 @@ resource "aws_security_group_rule" "allow_lb_https_traffic" {
   security_group_id = aws_security_group.docker_swarm_sg.id
 }
 
+resource "aws_security_group_rule" "docker_swarm_ingress_from_alb_http" {
+  count                    = var.create_extlb && var.load_balancer_type == "application" ? 1 : 0
+  description              = "Allow incoming HTTP traffic from the public load balancer"
+  type                     = "ingress"
+  from_port                = var.extlb_http_port
+  to_port                  = var.extlb_http_port
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.public_lb_sg[count.index].id
+  security_group_id        = aws_security_group.docker_swarm_sg.id
+}
+
+resource "aws_security_group_rule" "docker_swarm_ingress_from_alb_https" {
+  count                    = var.create_extlb && var.load_balancer_type == "application" ? 1 : 0
+  description              = "Allow incoming HTTPS traffic from the public load balancer"
+  type                     = "ingress"
+  from_port                = var.extlb_https_port
+  to_port                  = var.extlb_https_port
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.public_lb_sg[count.index].id
+  security_group_id        = aws_security_group.docker_swarm_sg.id
+}
+
 # resource "aws_security_group" "efs_sg" {
 #   count       = var.efs_persistent_storage ? 1 : 0
 #   vpc_id      = var.vpc_id
-#   name        = "${var.common_prefix}-efs-sg-${var.environment}"
+#   name        = "${local.common_prefix}-efs-sg"
 #   description = "Allow EFS access from VPC subnets"
 
 #   egress {
@@ -85,7 +113,7 @@ resource "aws_security_group_rule" "allow_lb_https_traffic" {
 #   tags = merge(
 #     local.global_tags,
 #     {
-#       "Name" = lower("${var.common_prefix}-efs-sg-${var.environment}")
+#       "Name" = lower("${local.common_prefix}-efs-sg")
 #     }
 #   )
 # }

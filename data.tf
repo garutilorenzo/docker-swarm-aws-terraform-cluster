@@ -8,58 +8,40 @@ data "aws_iam_policy" "AmazonSSMManagedInstanceCore" {
   arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-data "template_cloudinit_config" "docker_swarm_manager" {
-  gzip          = true
-  base64_encode = true
-
-  part {
-    filename     = "init.cfg"
-    content_type = "text/cloud-config"
-    content      = templatefile("${path.module}/files/cloud-config-base.yaml", {})
-  }
-
-  part {
-    content_type = "text/x-shellscript"
-    content      = templatefile("${path.module}/files/install_docker.sh", {})
-  }
-
-  part {
-    content_type = "text/x-shellscript"
-    content = templatefile("${path.module}/files/docker_swarm.sh", {
-      default_secret_placeholder            = var.default_secret_placeholder,
-      docker_swarm_manager_tag_value        = var.docker_swarm_manager_tag_value,
-      docker_swarm_join_manager_secret_name = local.docker_swarm_join_manager_secret_name
-      docker_swarm_join_worker_secret_name  = local.docker_swarm_join_worker_secret_name
-      docker_swarm_tag_key                  = var.docker_swarm_tag_key
-      aws_region                            = data.aws_region.current.name
-    })
-  }
+data "aws_iam_policy" "AutoScalingNotificationAccessRole" {
+  arn = "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
 }
 
-data "template_cloudinit_config" "docker_swarm_worker" {
+data "template_cloudinit_config" "docker_swarm_cloudinit" {
   gzip          = true
   base64_encode = true
 
   part {
     filename     = "init.cfg"
     content_type = "text/cloud-config"
-    content      = templatefile("${path.module}/files/cloud-config-base.yaml", {})
+    content = templatefile("${path.module}/files/cloud-config-base.yaml", {
+      ec2_utils_py_b64           = filebase64("${path.module}/files/ec2_utils.py")
+      deploy_traefik_py_b64      = filebase64("${path.module}/files/deploy_traefik.py")
+      init_swarm_py_b64          = filebase64("${path.module}/files/init_swarm.py")
+      setup_docker_ssl_certs_b64 = filebase64("${path.module}/files/setup_docker_ssl_certs.py")
+    })
   }
 
   part {
     content_type = "text/x-shellscript"
-    content      = templatefile("${path.module}/files/install_docker.sh", {})
-  }
-
-  part {
-    content_type = "text/x-shellscript"
-    content = templatefile("${path.module}/files/docker_swarm.sh", {
-      default_secret_placeholder            = var.default_secret_placeholder,
-      docker_swarm_manager_tag_value        = var.docker_swarm_manager_tag_value,
-      docker_swarm_join_manager_secret_name = local.docker_swarm_join_manager_secret_name
-      docker_swarm_join_worker_secret_name  = local.docker_swarm_join_worker_secret_name
-      docker_swarm_tag_key                  = var.docker_swarm_tag_key
-      aws_region                            = data.aws_region.current.name
+    content = templatefile("${path.module}/files/install_docker.sh", {
+      docker_swarm_manager_tag              = var.docker_swarm_manager_tag,
+      docker_swarm_worker_tag               = var.docker_swarm_worker_tag,
+      docker_swarm_secret_name              = local.docker_swarm_secret_name
+      docker_ca_ssl_secret_name             = local.docker_ca_ssl_secret_name
+      docker_client_ssl_secret_name         = local.docker_client_ssl_secret_name
+      deploy_traefik                        = var.deploy_traefik
+      expose_traefik_dashboard              = var.expose_traefik_dashboard
+      traefik_forwarded_headers_trusted_ips = var.vpc_subnet_cidr
+      traefik_dashboard_fqdn                = var.traefik_dashboard_fqdn
+      traefik_dashboard_username            = var.traefik_dashboard_username
+      traefik_dashboard_password            = var.traefik_dashboard_password
+      traefik_dashboard_ip_whitelist        = var.traefik_dashboard_ip_whitelist
     })
   }
 }
@@ -71,7 +53,7 @@ data "aws_instances" "docker_swarm_managers" {
   ]
 
   instance_tags = {
-    for tag, value in merge(local.global_tags, { "${var.docker_swarm_tag_key}" = "${var.docker_swarm_manager_tag_value}" }) : tag => value
+    for tag, value in merge(local.global_tags, { "${var.docker_swarm_manager_tag}" = "true" }) : tag => value
   }
 
   instance_state_names = ["running"]
@@ -84,7 +66,7 @@ data "aws_instances" "docker_swarm_workers" {
   ]
 
   instance_tags = {
-    for tag, value in merge(local.global_tags, { "${var.docker_swarm_tag_key}" = "${var.docker_swarm_manager_tag_worker}" }) : tag => value
+    for tag, value in merge(local.global_tags, { "${var.docker_swarm_worker_tag}" = "true" }) : tag => value
   }
 
   instance_state_names = ["running"]

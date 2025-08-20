@@ -1,5 +1,5 @@
 resource "aws_autoscaling_group" "docker_swarm_managers_asg" {
-  name                      = "${var.common_prefix}-managers-asg-${var.environment}"
+  name                      = "${local.common_prefix}-managers-asg"
   wait_for_capacity_timeout = "5m"
   vpc_zone_identifier       = var.vpc_private_subnets
 
@@ -49,24 +49,23 @@ resource "aws_autoscaling_group" "docker_swarm_managers_asg" {
 
   tag {
     key                 = "Name"
-    value               = "${var.common_prefix}-manager-${var.environment}"
+    value               = "${local.common_prefix}-manager"
     propagate_at_launch = true
   }
 
   tag {
-    key                 = var.docker_swarm_tag_key
-    value               = var.docker_swarm_manager_tag_value
+    key                 = var.docker_swarm_manager_tag
+    value               = "true"
     propagate_at_launch = true
   }
 
   depends_on = [
-    aws_secretsmanager_secret.join_manager_secret,
-    aws_secretsmanager_secret.join_worker_secret,
+    aws_secretsmanager_secret.join_secret,
   ]
 }
 
 resource "aws_autoscaling_group" "docker_swarm_workers_asg" {
-  name                = "${var.common_prefix}-workers-asg-${var.environment}"
+  name                = "${local.common_prefix}-workers-asg"
   vpc_zone_identifier = var.vpc_private_subnets
 
   lifecycle {
@@ -115,18 +114,63 @@ resource "aws_autoscaling_group" "docker_swarm_workers_asg" {
 
   tag {
     key                 = "Name"
-    value               = "${var.common_prefix}-worker-${var.environment}"
+    value               = "${local.common_prefix}-worker"
     propagate_at_launch = true
   }
 
   tag {
-    key                 = var.docker_swarm_tag_key
-    value               = var.docker_swarm_manager_tag_worker
+    key                 = var.docker_swarm_worker_tag
+    value               = "true"
     propagate_at_launch = true
   }
 
   depends_on = [
-    aws_secretsmanager_secret.join_manager_secret,
-    aws_secretsmanager_secret.join_worker_secret,
+    aws_secretsmanager_secret.join_secret,
   ]
+}
+
+#######################################
+# Lifecycle Hooks for ASG Termination #
+#######################################
+
+# {
+#   "version": "0",
+#   "id": "782d5b4c-0f6f-1fd6-9d62-ecf6aed0a470",
+#   "detail-type": "EC2 Instance-terminate Lifecycle Action",
+#   "source": "aws.autoscaling",
+#   "account": "123456789012",
+#   "time": "2020-07-01T22:19:58Z",
+#   "region": "us-east-1",
+#   "resources": [
+#     "arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:26e7234b-03a4-47fb-b0a9-2b241662774e:autoScalingGroupName/testt1.demo-0a20f32c.kops.sh"
+#   ],
+#   "detail": {
+#     "LifecycleActionToken": "0befcbdb-6ecd-498a-9ff7-ae9b54447cd6",
+#     "AutoScalingGroupName": "testt1.demo-0a20f32c.kops.sh",
+#     "LifecycleHookName": "cluster-termination-handler",
+#     "EC2InstanceId": "i-0633ac2b0d9769723",
+#     "LifecycleTransition": "autoscaling:EC2_INSTANCE_TERMINATING"
+#   }
+# }
+
+resource "aws_autoscaling_lifecycle_hook" "managers_term_hook" {
+  name                   = "${local.common_prefix}-termination-handler"
+  autoscaling_group_name = aws_autoscaling_group.docker_swarm_managers_asg.name
+  default_result         = "CONTINUE"
+  heartbeat_timeout      = 300
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
+
+  notification_target_arn = aws_sqs_queue.ec2_events_queue.arn
+  role_arn                = aws_iam_role.notification_asg_iam_role.arn
+}
+
+resource "aws_autoscaling_lifecycle_hook" "workders_term_hook" {
+  name                   = "${local.common_prefix}-termination-handler"
+  autoscaling_group_name = aws_autoscaling_group.docker_swarm_workers_asg.name
+  default_result         = "CONTINUE"
+  heartbeat_timeout      = 300
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
+
+  notification_target_arn = aws_sqs_queue.ec2_events_queue.arn
+  role_arn                = aws_iam_role.notification_asg_iam_role.arn
 }

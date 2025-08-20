@@ -1,4 +1,27 @@
 #cloud-config
 
-runcmd:
-- echo "Done"
+write_files:
+  - content: |
+      ${ec2_utils_py_b64}
+    encoding: b64
+    owner: root:root
+    path: /usr/local/lib/ec2_utils.py
+    permissions: '0644'
+  - content: |
+      ${deploy_traefik_py_b64}
+    encoding: b64
+    owner: root:root
+    path: /usr/local/sbin/deploy_traefik.py
+    permissions: '0700'
+  - content: |
+      ${init_swarm_py_b64}
+    encoding: b64
+    owner: root:root
+    path: /usr/local/sbin/init_swarm.py
+    permissions: '0700'
+  - content: |
+      ${setup_docker_ssl_certs_b64}
+    encoding: b64
+    owner: root:root
+    path: /usr/local/sbin/setup_docker_ssl_certs.py
+    permissions: '0700'
