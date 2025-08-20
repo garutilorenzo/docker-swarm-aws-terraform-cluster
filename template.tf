@@ -21,7 +21,7 @@ resource "aws_launch_template" "docker_swarm_manager" {
     }
   }
 
-  key_name = var.ssk_key_pair_name
+  key_name = var.ssk_key_pair_name != "" ? var.ssk_key_pair_name : null
 
   network_interfaces {
     associate_public_ip_address = var.ec2_associate_public_ip_address
@@ -59,7 +59,7 @@ resource "aws_launch_template" "docker_swarm_worker" {
     }
   }
 
-  key_name = var.ssk_key_pair_name
+  key_name = var.ssk_key_pair_name != "" ? var.ssk_key_pair_name : null
 
   network_interfaces {
     associate_public_ip_address = var.ec2_associate_public_ip_address
